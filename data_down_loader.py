@@ -5,8 +5,7 @@ import json
 # set values
 url = "https://fantasy.espn.com/apis/v3/games/ffl/seasons/2019/segments/0/leagues/554351"
 
-cookies = {"espn_s2": "AEAdhzG%2FqHqQvSozP7tIGsj2D3W0gBiJd57XgcsY5eYs9BXTEmMhCbwOu0c8mAxSb9hkgu9bwLonKukAs3NJA0hNXTBzx%2BCD0i7wLtRgKHg%2Bmyb19XQ5i2S%2F7oigMX8JyFnukDDbx6IN4BCQHQE1N2sPf66Td3D8GQovg1yVmbOZJEF1kWEsSIVUar6xmxvq15aM2nQNP%2FTgFC6fQgR3rDRXzsNXeWGULoTM8lA4D2QcFDMEsuJhhzXKxhtMsDg%2FkYwN98MgRAOzozfZoj1BLiPZ",
-           "SWID": "{8E969096-152C-432E-9690-96152CF32E34}"}
+cookies = {XXXX}
 
 # get request - mMatchup view
 r = requests.get(url, params = {"view": "mMatchup"}, cookies=cookies)
