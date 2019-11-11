@@ -1,0 +1,591 @@
+---
+title: "Yours in the Fantasy Analysis: Better Late Than Never"
+author: "Luke Wilson"
+date: "Week 9"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r python_import_code, include=FALSE}
+# # imports
+# import requests
+# import json
+# 
+# # set values
+# url = "https://fantasy.espn.com/apis/v3/games/ffl/seasons/2019/segments/0/leagues/554351"
+# 
+# #get cookies from browser
+# cookies = {"espn_s2": espn_s2,
+#            "SWID":    SWID}
+# 
+# # get request - mMatchup view
+# r = requests.get(url, params = {"view": "mMatchup"}, cookies=cookies)
+# d = r.json()
+# 
+# with open('mMatchup.txt', 'w') as outfile:
+#     json.dump(d, outfile)
+# 
+# # get request - mTeam view
+# r = requests.get(url, params = {"view": "mTeam"}, cookies=cookies)
+# d = r.json()
+# 
+# with open('mTeam.txt', 'w') as outfile:
+#     json.dump(d, outfile)
+# 
+# # get request - league Data
+# r = requests.get(url, cookies=cookies)
+# d = r.json()
+# 
+# with open('leagueData.txt', 'w') as outfile:
+#     json.dump(d, outfile)
+# 
+# # get request - boxscore
+# r = requests.get(url, params = {"view": "mMatchupScore"}, cookies=cookies)
+# d = r.json()
+# 
+# with open('boxscore.txt', 'w') as outfile:
+#     json.dump(d, outfile)
+# 
+# # get request - boxscore2
+# 
+# for weeks in range(1, 10):
+#     r = requests.get(url + '?view=mMatchup&view=mMatchupScore', params={'scoringPeriodId': weeks, 'matchupPeriodId': weeks}, cookies=cookies)
+#     d = r.json()
+#     filename = "boxscore2" + str(weeks) + ".txt"
+#     with open(filename, 'w') as outfile:
+#         json.dump(d, outfile)
+#     print(weeks)
+```
+
+```{r data_import, include=FALSE}
+rm(list = ls())
+
+library(httr)
+library(magrittr)
+library(jsonlite)
+library(dplyr)
+library(combinat)
+library(ggplot2)
+library(ggalt)
+library(knitr)
+
+currentWeek = 9
+simulate.schedules = 1
+import.player.data = 1
+
+## Matchup Scoring Data
+mMatchupView = fromJSON("C:/Users/lvwilson/Desktop/fantasy/untitled/mMatchup.txt")
+
+dat = data.frame(week       = mMatchupView$schedule$matchupPeriodId,
+                 awayPoints = mMatchupView$schedule$away$totalPoints,
+                 awayID     = mMatchupView$schedule$away$teamId,
+                 homePoints = mMatchupView$schedule$home$totalPoints,
+                 homeID     = mMatchupView$schedule$home$teamId)
+
+dat = filter(dat, currentWeek >= week) %>% 
+  group_by(week) %>%
+  mutate(matchupID = row_number())
+
+awayResults <- rename(dat,points = awayPoints, oppPoints = homePoints, ID = awayID, oppID = homeID)
+homeResults <- rename(dat,points = homePoints, oppPoints = awayPoints, ID = homeID, oppID = awayID)
+dat <- rbind(awayResults, homeResults)
+
+## League Overview Data
+leagueData = fromJSON("C:/Users/lvwilson/Desktop/fantasy/untitled/leagueData.txt")
+
+leagueDat = data.frame(ID = leagueData$teams$id,
+                       loca = leagueData$teams$location,
+                       name = leagueData$teams$nickname) %>%
+  mutate(fullname = paste(loca,name)) %>%
+  select(-c(loca, name)) %>%
+  mutate(fullname = ifelse(ID == 4, "Are Bonita Fish Big?", fullname)) %>%
+  mutate(owner = ifelse(ID==1,  "Cameron",
+                 ifelse(ID==3,  "KB",
+                 ifelse(ID==4,  "Roland",
+                 ifelse(ID==7,  "Carter/Ale",
+                 ifelse(ID==9,  "Kolin",
+                 ifelse(ID==10, "Luke",
+                 ifelse(ID==11, "Trainor",
+                 ifelse(ID==15, "Tex",
+                 ifelse(ID==16, "Rich",
+                 ifelse(ID==17, "KY","")))))))))))
+
+dat <- merge(dat, leagueDat) %>% mutate(winner = ifelse(points > oppPoints, 1, 0))
+
+## Boxscore Data
+
+if (import.player.data == 1) {
+  weekList = vector(mode = "list", length = currentWeek)
+  
+  for (weeks in 1:currentWeek) {
+    # read in weekly data
+    boxscorejson = fromJSON(paste0("C:/Users/lvwilson/Desktop/fantasy/untitled/boxscore2",weeks,".txt"))
+    awayteams <- vector(mode = "list", length = 5)
+    hometeams <- vector(mode = "list", length = 5)
+    
+    for (team in 1:5) {
+      
+      offset = (weeks - 1)*5
+      testAway = as.list(boxscorejson$schedule$away$rosterForCurrentScoringPeriod$entries[[team+offset]])
+      testHome = as.list(boxscorejson$schedule$home$rosterForCurrentScoringPeriod$entries[[team+offset]])
+      
+      awayteamID = mMatchupView$schedule$away$teamId[team+offset]
+      hometeamID = mMatchupView$schedule$home$teamId[team+offset]
+      
+      nPLayersAway = length(testAway$lineupSlotId)
+      nPLayersHome = length(testHome$lineupSlotId)
+      
+      awayTeamPlayer <- vector(mode= "list", length = nPLayersAway)
+      homeTeamPlayer <- vector(mode= "list", length = nPLayersHome)
+      
+      ## Away Teams
+      for (playerNum in 1:nPLayersAway) {
+        awayProjIndex <- which(testAway$playerPoolEntry$player$stats[[playerNum]]$statSourceId == 1)
+        
+        if (is.null(testAway$playerPoolEntry$player$stats[[playerNum]]$appliedTotal[awayProjIndex]) | 
+             length(testAway$playerPoolEntry$player$stats[[playerNum]]$appliedTotal)==1) {
+          awayproj = 0
+        } else {
+          awayproj = testAway$playerPoolEntry$player$stats[[playerNum]]$appliedTotal[awayProjIndex] 
+        }
+        
+        nElligbleSlots = length(testAway$playerPoolEntry$player$eligibleSlots[[playerNum]])
+        
+        awayTeamPlayer[[playerNum]] = data.frame(slotID = testAway$lineupSlotId[playerNum],
+                                                 points = testAway$playerPoolEntry$appliedStatTotal[playerNum],
+                                                 name = testAway$playerPoolEntry$player$fullName[playerNum],
+                                                 proj = awayproj, ID = awayteamID,
+                                                 possSlots = testAway$playerPoolEntry$player$eligibleSlots[[playerNum]])  
+      }
+      
+      ## Home Teams
+      for (playerNum in 1:nPLayersHome) {
+        homeProjIndex <- which(testHome$playerPoolEntry$player$stats[[playerNum]]$statSourceId == 1)
+        
+        if (is.null(testHome$playerPoolEntry$player$stats[[playerNum]]$appliedTotal[homeProjIndex]) | 
+             length(testHome$playerPoolEntry$player$stats[[playerNum]]$appliedTotal)==1) {
+          homeproj = 0
+        } else {
+          homeproj = testHome$playerPoolEntry$player$stats[[playerNum]]$appliedTotal[homeProjIndex] 
+        }
+        
+        nElligbleSlots = length(testHome$playerPoolEntry$player$eligibleSlots[[playerNum]])
+        
+        homeTeamPlayer[[playerNum]] = data.frame(slotID = testHome$lineupSlotId[playerNum],
+                                                 points = testHome$playerPoolEntry$appliedStatTotal[playerNum],
+                                                 name = testHome$playerPoolEntry$player$fullName[playerNum],
+                                                 proj = homeproj, ID = hometeamID,
+                                                 possSlots = testHome$playerPoolEntry$player$eligibleSlots[[playerNum]])  
+      }
+      ## turn lists of players into dataframe of players - for a single team
+      awayteams[[team]] = plyr::rbind.fill(awayTeamPlayer)
+      hometeams[[team]] = plyr::rbind.fill(homeTeamPlayer)
+    }
+    ## turn lists of single team dataframes into a league wide list
+    awayTeams = plyr::rbind.fill(awayteams) %>% mutate(week = weeks)
+    homeTeams = plyr::rbind.fill(hometeams) %>% mutate(week = weeks)
+    weekList[[weeks]] = rbind(awayTeams, homeTeams)
+  }
+  # turn league wide list into league wide dataframe
+  playerscoresDat = plyr::rbind.fill(weekList) 
+  table(playerscoresDat$ID, playerscoresDat$week)
+  
+  #cleanup
+  rm(awayResults, homeResults,  awayTeams, homeTeams,awayteams, hometeams,      boxscorejson, 
+     leagueData,  mMatchupView, testAway,  testHome, weekList,  awayTeamPlayer, homeTeamPlayer)
+  
+ saveRDS(playerscoresDat, "C:/Users/lvwilson/Desktop/fantasy/playerScores.rds")
+} else {
+  playerscoresDat<- readRDS("C:/Users/lvwilson/Desktop/fantasy/playerScores.rds")
+}
+```
+
+## Pythagorean Wins Analysis
+
+This analysis tries to calculate expected wins as a function of points for, and a proxy for points against. The exponent used is 13.91.
+
+
+```{r pythagorean_analysis, include=FALSE}
+butme <- function(x, team) {
+  x %>%
+    group_by(owner) %>% 
+    summarize(pf = sum(points)) %>%
+    filter(owner != team) -> .
+  return(as.numeric(mean(.$pf)))
+}
+
+## create dataframe of average of teams except for a team's points for
+teams <- unique(dat$owner)
+against.proxy <- vector(length = length(teams))
+
+for (i in 1:length(teams)) {
+  against.proxy[i] <- butme(dat, teams[i])
+}
+
+f = 13.91
+
+againstProxies <- data.frame(owner = teams, proxy= against.proxy)
+pyThagStats <- dat %>% group_by(owner) %>% summarize(points = sum(points), wins = sum(winner)) %>% 
+  merge(againstProxies) %>%
+  mutate(winratio = points^f/(points^f + proxy^f)) %>%
+  mutate(expectedWins = winratio*currentWeek) %>%
+  mutate(difference = wins - expectedWins) %>%
+  select(-c(points, proxy, winratio)) %>%
+  mutate(expectedWins = round(expectedWins, 2), difference = round(difference, 2))
+
+names(pyThagStats) <- c("Team", "Actual Wins", "Expected Wins", "Actual Wins - Expected Wins")
+
+rm(againstProxies)
+```
+
+
+```{r allscheds3, echo=FALSE}
+  DT::datatable(pyThagStats)
+```
+
+## Total Wins Approach
+
+This approach sums, for each week, how many other teams you would have beaten. A team's expected win percentage is then calculated as the number of actual possible wins, divided by the maximum number of possible wins possible, 9*number of weeks.
+
+
+```{r total_week_wins, include=FALSE}
+############################ x
+### Checking Total Week Wins
+############################ x  
+
+head(dat) 
+datWeekWins <- dat %>% group_by(week) %>% 
+  mutate(nwins = order(order(points, decreasing = FALSE))-1) %>%
+  ungroup %>% group_by(owner) %>% summarise(weekwins = sum(nwins), wins = sum(winner)) %>%
+  mutate(potentialWins = currentWeek*9, expectedWins = (weekwins/potentialWins)*currentWeek) %>%
+  mutate(diference = wins - expectedWins) %>%
+  select(-c(potentialWins)) %>%
+  mutate(expectedWins = round(expectedWins, 2), diference = round(diference, 2))
+
+names(datWeekWins) <-  c("Team", "Week Wins", "Actual Wins", "Expected Wins", "Actual Wins - Expected Wins")
+
+```
+
+
+```{r week_wins_table, echo=FALSE}
+  DT::datatable(datWeekWins)
+```
+
+
+## All Schedules Simulated
+
+Our league is setup so that each team plays each of the other 9 teams once during the first 9 weeks of the season, and then replays the first 4 teams they played. There 362880 such possible schedules. 
+
+```{r simulate_all_schedules, include=FALSE}
+
+############################ x
+### Simulate All Schedules....
+############################ x  
+
+schedules <- vector(mode = "list", length = 10)
+team_ids <- unique(dat$ID)
+
+if (simulate.schedules == 1) {
+  
+  ## Generate dataframe of all possible schedules
+  for(i in 1:length(team_ids)) {
+    teamID <- team_ids[i]
+    teams.except <- team_ids[team_ids != teamID]
+    schedules[[i]] <- combinat::permn(teams.except)
+    nr = length(schedules[[i]])
+    for (j in 1:nr) {
+      schedules[[i]][[j]] <- c(schedules[[i]][[j]], schedules[[i]][[j]][1:4]) 
+    }
+    schedules[[i]] <- unlist(schedules[[i]])
+    schedules[[i]] <- data.frame(teamID = team_ids[i], nschedule = rep(1:362880, each = 13),
+                                 week = rep(1:13, times = 362880), opponentID = schedules[[i]])
+    print(i)
+  }
+  all.sched = plyr::rbind.fill(schedules)
+  all.sched %<>% filter(week <= currentWeek)
+  
+  rm(schedules)
+  
+  ## merge on points scored by each team - takes forever
+  scores         <- dat[,c("week", "ID", "points")] %>% rename(teamID=ID)
+  scoresOpponent <- dat[,c("week", "ID", "points")] %>% rename(opponentID=ID, oppPoints = points)
+  all.sched <- inner_join(all.sched, scoresOpponent) 
+  all.sched <- inner_join(all.sched, scores)
+  all.sched <- mutate(all.sched, winner = ifelse(points > oppPoints, 1, 0))
+
+  leagueDat <- leagueDat %>% rename(teamID=ID)
+
+  ## collapse results at schedule level
+  allSchedSum <- all.sched %>% group_by(nschedule, teamID) %>% 
+    summarize(nWins = sum(winner)) %>% ungroup %>% mutate(count = 1)
+  
+  ## collapse results at team level
+  allResults <- allSchedSum %>% group_by(teamID, nWins) %>%
+    summarise(nResults = sum(count)) %>% merge(leagueDat)
+  
+  rm(allSchedSum, all.sched)
+  
+  saveRDS(allResults, "C:/Users/lvwilson/Desktop/fantasy/allsched.rds")
+} else {
+  allResults <- readRDS("C:/Users/lvwilson/Desktop/fantasy/allsched.rds")
+}
+
+forMerge <- leagueDat %>% select(-c(fullname))
+
+allResults <- allResults %>% select(-c(fullname)) %>% merge(forMerge)
+
+# faceted histogram of wins
+
+sp <- ggplot(allResults, aes(x=nWins, y =nResults)) + 
+  geom_bar(stat = "identity") +
+  facet_wrap(~owner, ncol = 2)
+
+ 
+
+## max/min table
+maxMinTable <- allResults %>%
+  group_by(owner) %>%
+  summarise(minWins = min(nWins), maxWins = max(nWins)) %>%
+  merge(allResults) %>%
+  filter(nWins == minWins | nWins == maxWins) %>%
+  mutate(minOrMax = ifelse(nWins == minWins, "min", "max")) %>%
+  select(-c(nWins, teamID)) %>%
+  reshape(timevar = "minOrMax", idvar = c("owner", "minWins", "maxWins"), direction = "wide")
+
+names(maxMinTable) <-  c("Team", "Min Wins Possible", "Max Wins Possible", "# Min", "# Max")
+
+rm(allResults)
+```
+
+### Distribution of Wins over All Potential Schedules
+
+
+```{r allscheds, echo=FALSE}
+  print(sp)
+```
+
+### Max and Min Wins Possible
+
+This table shows, for each team, the maximum number of wins and the minimum number of wins that each team could have achieved over all possible schedules. It also shows out of the 362880 possible schedules, how many times a team achieves that number of wins. 
+
+```{r max_min_table, echo=FALSE}
+  DT::datatable(maxMinTable)
+```
+
+
+```{r start_sit_data, include=FALSE}
+
+############################ x
+### Start sit analysis
+############################ x
+
+## constructing data
+'%ni%' <- Negate('%in%')
+
+usedSlots = unique(playerscoresDat$slotID)
+teams = unique(playerscoresDat$ID)
+weeks = unique(playerscoresDat$week)
+playerscoresDatt <- playerscoresDat %>% filter(possSlots %in% usedSlots & possSlots != 20) %>% mutate(name = as.character(name))
+
+lineups = vector(mode = "list", length = length(teams))
+
+## construct optimal lineups
+for (team in teams) {
+  weeklylineups = vector(mode = "list", length = length(weeks))
+  
+  for (weeknum in 1:currentWeek) {
+    
+    playerscoresDat_temp <- playerscoresDatt %>% filter(week == weeknum & ID == team) 
+    topQB   <- playerscoresDat_temp %>% filter(possSlots ==  0)  %>% arrange(desc(points)) %>% slice(1)
+    topDST  <- playerscoresDat_temp %>% filter(possSlots ==  16) %>% arrange(desc(points)) %>% slice(1)
+    topK    <- playerscoresDat_temp %>% filter(possSlots ==  17) %>% arrange(desc(points)) %>% slice(1)
+    topTE   <- playerscoresDat_temp %>% filter(possSlots ==  6)  %>% arrange(desc(points)) %>% slice(1)
+    
+    topWR <- playerscoresDat_temp %>% filter(possSlots ==  4) %>% arrange(desc(points)) %>% slice(1:2)
+    topRB <- playerscoresDat_temp %>% filter(possSlots ==  2) %>% arrange(desc(points)) %>% slice(1:2)
+    
+    usedNames = c(topWR$name, topRB$name, topTE$name)
+    topFlex <- playerscoresDat_temp %>% filter(name %ni% usedNames & possSlots == 23) %>% arrange(desc(points)) %>% slice(1) 
+    
+    weeklylineups[[weeknum]] = rbind(topQB, topDST, topK, topTE, topWR, topRB, topFlex)
+  }
+  
+  lineups[[team]] <- plyr::rbind.fill(weeklylineups)
+}
+lineUps <- plyr::rbind.fill(lineups) %>% arrange(week, ID) %>% group_by(week, ID) %>% summarize(maxScore = sum(points))
+
+rm(topQB, topDST, topK, topTE, topWR, topRB, topFlex, weeklylineups, lineups, playerscoresDat_temp)
+
+merged <- merge(lineUps, dat)
+```
+
+## Start/Sit Efficiency Analysis
+
+```{r start_sit_analysis, include=FALSE}
+
+## Analysis
+# Total Lost Points and average maxscore
+merged2 <- merged %>% mutate(lostPoints = maxScore - points) %>% group_by(owner) %>% 
+  summarise(lostPoints = sum(lostPoints), avgOpt = mean(maxScore), avgPoints = mean(points)) %>% mutate(lostPoints = lostPoints/currentWeek) %>%
+  mutate(lostPoints = round(lostPoints, 2), avgOpt = round(avgOpt, 2), avgPoints = round(avgPoints, 2))
+names(merged2) <- c("Team", "Average Lost Points", "Average Optimal Points", "Average Points")
+
+# Who has perfect weeks?
+perfectWeeks = merged %>% filter(maxScore == points) 
+
+# Barbell plot
+dattt <- merged %>%  
+  group_by(owner) %>% summarise(avgPoints = mean(points), avgOpt = mean(maxScore)) %>% 
+  arrange(desc(avgPoints))
+dattt$owner <- factor(dattt$owner, levels=as.character(dattt$owner)) 
+
+gg <- ggplot(dattt, aes(x=avgPoints, xend=avgOpt, y=owner, group=owner)) + 
+  geom_dumbbell(color="#a3c4dc", 
+                size=2,
+                colour_x = "blue",
+                colour_xend = "blue",
+                show.legend = TRUE) + 
+  labs(x=NULL, 
+       y=NULL, 
+       title="Average Actual Points vs. Possible Points")  +
+  theme(plot.title = element_text(hjust=0.5, face="bold"),
+        plot.background=element_rect(fill="#f7f7f7"),
+        panel.background=element_rect(fill="#f7f7f7"),
+        panel.grid.minor=element_blank(),
+        panel.grid.major.y=element_blank(),
+        panel.grid.major.x=element_line(),
+        axis.ticks=element_blank(),
+        legend.position="top",
+        panel.border=element_blank())
+
+# Optimal Lineup records
+oppLineUps <- lineUps %>% rename(oppID = ID, oppMaxScore = maxScore)
+mergdOppScore <- merge(merged, oppLineUps) %>% mutate(optWinner = ifelse(maxScore > oppMaxScore, 1, 0)) %>%
+  group_by(owner) %>% summarize(winsOptimal = sum(optWinner), actualWins = sum(winner)) %>%
+  mutate(difference = winsOptimal - actualWins)
+names(mergdOppScore) <- c("Team", "Optimal Lineup Wins", "Actual Wins", "Optimal - Actual Wins")
+```
+
+### Optimal Records
+
+This table contains each teams records if they and their opponent played their optimal lineups each week. 
+
+```{r optimal_wins, echo=FALSE}
+  DT::datatable(mergdOppScore)
+```
+
+### Average Points Left on Bench
+
+```{r optimal_wins_table, echo=FALSE}
+  DT::datatable(merged2)
+```
+
+```{r barbell_plot, echo=FALSE}
+  print(gg)
+```
+
+## Actuals vs Projections
+
+This section of analysis concerns projections.
+
+```{r actual_vs_projection, echo=FALSE}
+  
+usedSlots = unique(playerscoresDat$slotID)
+teams = unique(playerscoresDat$ID)
+weeks = unique(playerscoresDat$week)
+playerscoresDatt <- playerscoresDat %>% filter(possSlots %in% usedSlots & possSlots != 20) %>% mutate(name = as.character(name))
+
+lineups = vector(mode = "list", length = length(teams))
+
+## construct optimal lineups by projection
+for (team in teams) {
+  weeklylineups = vector(mode = "list", length = length(weeks))
+  
+  for (weeknum in 1:currentWeek) {
+    
+    playerscoresDat_temp <- playerscoresDatt %>% filter(week == weeknum & ID == team) 
+    topQB   <- playerscoresDat_temp %>% filter(possSlots ==  0)  %>% arrange(desc(proj)) %>% slice(1)
+    topDST  <- playerscoresDat_temp %>% filter(possSlots ==  16) %>% arrange(desc(proj)) %>% slice(1)
+    topK    <- playerscoresDat_temp %>% filter(possSlots ==  17) %>% arrange(desc(proj)) %>% slice(1)
+    topTE   <- playerscoresDat_temp %>% filter(possSlots ==  6)  %>% arrange(desc(proj)) %>% slice(1)
+    
+    topWR <- playerscoresDat_temp %>% filter(possSlots ==  4) %>% arrange(desc(proj)) %>% slice(1:2)
+    topRB <- playerscoresDat_temp %>% filter(possSlots ==  2) %>% arrange(desc(proj)) %>% slice(1:2)
+    
+    usedNames = c(topWR$name, topRB$name, topTE$name)
+    topFlex <- playerscoresDat_temp %>% filter(name %ni% usedNames & possSlots == 23) %>% arrange(desc(proj)) %>% slice(1) 
+    
+    weeklylineups[[weeknum]] = rbind(topQB, topDST, topK, topTE, topWR, topRB, topFlex)
+  }
+  
+  lineups[[team]] <- plyr::rbind.fill(weeklylineups)
+}
+projlineUps <- plyr::rbind.fill(lineups) %>% arrange(week, ID) %>% group_by(week, ID) %>% summarize(maxScore = sum(points))
+
+rm(topQB, topDST, topK, topTE, topWR, topRB, topFlex, weeklylineups, lineups, playerscoresDat_temp)
+
+projd_actuals <- merge(projlineUps, dat)
+
+ratingsWhores <- projd_actuals %>% filter(maxScore == points) %>% 
+  mutate(count = 1) %>% group_by(owner) %>% summarise(nTimes = sum(count)) %>% arrange(desc(nTimes))
+names(ratingsWhores) <- c("Team", "Number of Weeks")
+
+espnVsOwner <- projd_actuals %>% mutate(espnWinner = ifelse(maxScore > oppPoints, 1, 0)) %>%
+  group_by(owner) %>% summarize(espnWins = sum(espnWinner), ownerWins = sum(winner)) %>% 
+  mutate(difference = espnWins - ownerWins) %>% arrange(desc(difference))
+names(espnVsOwner) <- c("Team", "ESPN Wins", "Actual Wins", "ESPN - Actual Wins")
+
+# Barbell plot
+dattt <- projd_actuals %>% 
+  group_by(owner) %>% summarise(avgPoints = mean(points), avgESPN = mean(maxScore)) %>% 
+  arrange(desc(avgPoints))
+dattt$owner <- factor(dattt$owner, levels=as.character(dattt$owner)) 
+
+gg <- ggplot(dattt, aes(x=avgPoints, xend=avgESPN, y=owner, group=owner)) + 
+  geom_dumbbell(color="#a3c4dc", 
+                size=2,
+                colour_x = "blue",
+                colour_xend = "red",
+                show.legend = TRUE) + 
+  labs(x=NULL, 
+       y=NULL, 
+       title="Owner Linups (Blue) vs. ESPN Lineups (Red)")  +
+  theme(plot.title = element_text(hjust=0.5, face="bold"),
+        plot.background=element_rect(fill="#f7f7f7"),
+        panel.background=element_rect(fill="#f7f7f7"),
+        panel.grid.minor=element_blank(),
+        panel.grid.major.y=element_blank(),
+        panel.grid.major.x=element_line(),
+        axis.ticks=element_blank(),
+        legend.position="top",
+        panel.border=element_blank())
+
+```
+
+## Average Owner Set Lineups Score vs. ESPN Lineups Score Based on Projections
+
+### Lineup Skill
+
+This plot contains the average score of the user set lineup, and the average score of the lineup that was projected by ESPN to score the most each week. 
+
+```{r barbell_plot_espn, echo=FALSE}
+  print(gg)
+```
+
+This table contains each owners record if they started the lineup that was projected by ESPN to score the most each week.
+
+```{r espnVsOwner, echo=FALSE}
+  DT::datatable(espnVsOwner)
+```
+
+### Whores to the Rating Agencies
+
+This table containst the number of times that each team played the lineup that was projected by ESPN to score the most each week.
+
+```{r ratingsWhores, echo=FALSE}
+  DT::datatable(ratingsWhores)
+```
+
