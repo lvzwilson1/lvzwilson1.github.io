@@ -22,11 +22,12 @@ library(ggplot2)
 library(ggalt)
 library(knitr)
 library(reticulate)
+library(tidyr)
 
 currentWeek = 9
-simulate.schedules = 1
-import.player.data = 1
-download.data      = 1
+simulate.schedules = 0
+import.player.data = 0
+download.data      = 0
 
 if (download.data == 1) py_run_file("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/data_down_loader.py")
 
@@ -540,5 +541,59 @@ This table containst the number of times that each team played the lineup that w
 
 ```{r ratingsWhores, echo=FALSE}
   DT::datatable(ratingsWhores)
+```
+
+
+## Positional Strengths and Weaknesses
+
+Note that a teams WR1/RB1 is the WR/RB each week that scored the most points. 
+
+```{r positional_strength, echo=FALSE}
+
+actualScores <- playerscoresDat %>% filter(slotID == possSlots & slotID != 20) %>%
+  arrange(ID, slotID, week, desc(points)) %>% group_by(week, ID, slotID) %>% mutate(posNum = seq_along(points)) %>%
+  ungroup %>% group_by(ID, slotID, posNum) %>% summarise(avgPoints = mean(points)) %>%
+  inner_join(leagueDat, by = "ID") %>%
+  mutate(position = ifelse(slotID == 0, "QB",
+                    ifelse(slotID == 2 & posNum == 1, "RB1",
+                    ifelse(slotID == 2 & posNum == 2, "RB2",
+                    ifelse(slotID == 4 & posNum == 1, "WR1",
+                    ifelse(slotID == 4 & posNum == 2, "WR2",
+                    ifelse(slotID == 6,  "TE",
+                    ifelse(slotID == 16, "DST",
+                    ifelse(slotID == 17, "K",
+                    ifelse(slotID == 23, "FLEX", ""
+                    )))))))))) %>% 
+  ungroup %>% select(c(owner, position, avgPoints)) %>%
+  group_by(position) %>% mutate(avgPosPoints = mean(avgPoints)) %>%
+  mutate(pointsOverAvg = round(avgPoints - avgPosPoints,1))
+
+pointsByPosTab <- actualScores %>%
+  select(c(owner, position, avgPoints)) %>%
+  mutate(avgPoints = round(avgPoints, 2)) %>%
+  spread(position, avgPoints) %>%
+  rename(Owner = owner) %>%
+  mutate(Total = QB+WR1+WR2+RB1+RB2+TE+DST+K+FLEX) %>%
+  arrange(desc(Total))
+  
+ggg <- ggplot(actualScores, aes(owner, position, fill = pointsOverAvg)) + 
+  geom_tile(colour = "white") + 
+  geom_text(aes(label=pointsOverAvg)) +
+  scale_fill_gradient(low="red", high="green") +
+  labs(x="Owner",
+       y="Points Above Average in League",
+       title = "Points by Position")
+
+```
+
+
+```{r pointsByPosTab, echo=FALSE}
+  DT::datatable(pointsByPosTab)
+```
+
+## Points Above Average by Position
+
+```{r points_by_pos, echo=FALSE}
+  print(ggg)
 ```
 
