@@ -23,6 +23,7 @@ library(ggalt)
 library(knitr)
 library(reticulate)
 library(tidyr)
+library(scales)
 
 currentWeek = 9
 simulate.schedules = 0
@@ -232,7 +233,7 @@ names(datWeekWins) <-  c("Team", "Week Wins", "Actual Wins", "Expected Wins", "A
 
 ## All Schedules Simulated
 
-Our league is setup so that each team plays each of the other 9 teams once during the first 9 weeks of the season, and then replays the first 4 teams they played. There 362880 such possible schedules. 
+Our league is setup so that each team plays each of the other 9 teams once during the first 9 weeks of the season, and then replays the first 4 teams they played. There are 362,880 such possible schedules. 
 
 ```{r simulate_all_schedules, include=FALSE}
 
@@ -271,7 +272,7 @@ if (simulate.schedules == 1) {
   all.sched <- inner_join(all.sched, scores)
   all.sched <- mutate(all.sched, winner = ifelse(points > oppPoints, 1, 0))
 
-  leagueDat <- leagueDat %>% rename(teamID=ID)
+  leagueDatttt <- leagueDat %>% rename(teamID=ID)
 
   ## collapse results at schedule level
   allSchedSum <- all.sched %>% group_by(nschedule, teamID) %>% 
@@ -279,7 +280,7 @@ if (simulate.schedules == 1) {
   
   ## collapse results at team level
   allResults <- allSchedSum %>% group_by(teamID, nWins) %>%
-    summarise(nResults = sum(count)) %>% merge(leagueDat)
+    summarise(nResults = sum(count)) %>% merge(leagueDatttt)
   
   rm(allSchedSum, all.sched)
   
@@ -546,6 +547,8 @@ This table containst the number of times that each team played the lineup that w
 
 ## Positional Strengths and Weaknesses
 
+### Average Points by Position and Team
+
 Note that a teams WR1/RB1 is the WR/RB each week that scored the most points. 
 
 ```{r positional_strength, echo=FALSE}
@@ -566,7 +569,7 @@ actualScores <- playerscoresDat %>% filter(slotID == possSlots & slotID != 20) %
                     )))))))))) %>% 
   ungroup %>% select(c(owner, position, avgPoints)) %>%
   group_by(position) %>% mutate(avgPosPoints = mean(avgPoints)) %>%
-  mutate(pointsOverAvg = round(avgPoints - avgPosPoints,1))
+  mutate(pointsOverAvg = round(100*(avgPoints - avgPosPoints)/avgPosPoints,0))
 
 pointsByPosTab <- actualScores %>%
   select(c(owner, position, avgPoints)) %>%
@@ -576,13 +579,18 @@ pointsByPosTab <- actualScores %>%
   mutate(Total = QB+WR1+WR2+RB1+RB2+TE+DST+K+FLEX) %>%
   arrange(desc(Total))
   
+maxValue <- max(abs(actualScores$pointsOverAvg))
+
 ggg <- ggplot(actualScores, aes(owner, position, fill = pointsOverAvg)) + 
   geom_tile(colour = "white") + 
   geom_text(aes(label=pointsOverAvg)) +
-  scale_fill_gradient(low="red", high="green") +
+  scale_fill_gradientn(colors=c("red","white","green"),
+                       values=rescale(c(-maxValue,0,maxValue)),
+                       limits=c(-maxValue,maxValue)) +
   labs(x="Owner",
-       y="Points Above Average in League",
-       title = "Points by Position")
+       y="Percent Above Average in League",
+       title = "Points by Position",
+       fill = "")
 
 ```
 

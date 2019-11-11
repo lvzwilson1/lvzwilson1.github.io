@@ -40,7 +40,7 @@ with open('C:/Users/lvwilson/Desktop/fantasy/untitled/boxscore.txt', 'w') as out
     json.dump(d, outfile)
 print("Downloaded Bozscore Data")
 
-# get request - boxscore2
+# get request - boxscore2 (player level data)
 for weeks in range(1, 10):
     r = requests.get(url + '?view=mMatchup&view=mMatchupScore', params={'scoringPeriodId': weeks, 'matchupPeriodId': weeks}, cookies=cookies)
     d = r.json()
