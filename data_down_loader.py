@@ -21,7 +21,7 @@ with open('C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Data/leagueDa
     json.dump(d, outfile)
 
 # get request - mMatchup view
-reports = ["mMatchup", "mTeam", "mMatchupScore"]
+reports = ["mMatchup", "mTeam", "mMatchupScore", "kona_player_info", "mSettings"]
 for report in reports:
     r = requests.get(url, params = {"view": report}, cookies=cookies)
     d = r.json()
@@ -29,10 +29,18 @@ for report in reports:
     with open(filename, 'w') as outfile:
         json.dump(d, outfile)
 
-# get request - boxscore2 (player level data)
-for weeks in range(1, 10):
+# get request - boxscore2 (player level data - for each team)
+for weeks in range(1, 11):
     r = requests.get(url + '?view=mMatchup&view=mMatchupScore', params={'scoringPeriodId': weeks, 'matchupPeriodId': weeks}, cookies=cookies)
     d = r.json()
     filename = "C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Data/boxscore2" + str(weeks) + ".txt"
+    with open(filename, 'w') as outfile:
+        json.dump(d, outfile)
+
+# get request - kona_view (player level data for the entire year, not team specific)
+for weeks2 in range(1, 11):
+    r = requests.get(url + '?view=kona_player_info', params={'scoringPeriodId': weeks2}, cookies=cookies)
+    d = r.json()
+    filename = "C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Data/kona_player_info_" + str(weeks2) + ".txt"
     with open(filename, 'w') as outfile:
         json.dump(d, outfile)

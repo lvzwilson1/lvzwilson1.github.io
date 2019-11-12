@@ -1,7 +1,7 @@
 ---
 title: "Yours in the Fantasy Analysis: Better Late Than Never"
 author: "Luke Wilson"
-date: "Week 9"
+date: "Week 10"
 output: html_document
 ---
 
@@ -25,10 +25,10 @@ library(reticulate)
 library(tidyr)
 library(scales)
 
-currentWeek = 9
+currentWeek = 10
 simulate.schedules = 1
 import.player.data = 1
-download.data      = 1
+download.data      = 0
 
 if (download.data == 1) py_run_file("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/data_down_loader.py")
 
@@ -230,10 +230,36 @@ if (simulate.schedules == 1) {
 
 ```
 
+## Total Wins Approach
+
+This approach sums, for each week, how many other teams you would have beaten. A team's expected win percentage is then calculated as the number of actual possible wins, divided by the maximum number of possible wins possible, 9*number of weeks.
+
+
+```{r total_week_wins, include=FALSE}
+############################ x
+### Checking Total Week Wins
+############################ x  
+
+head(dat) 
+datWeekWins <- dat %>% group_by(week) %>% 
+  mutate(nwins = order(order(points, decreasing = FALSE))-1) %>%
+  ungroup %>% group_by(owner) %>% summarise(weekwins = sum(nwins), wins = sum(winner)) %>%
+  mutate(potentialWins = currentWeek*9, expectedWins = (weekwins/potentialWins)*currentWeek) %>%
+  mutate(diference = wins - expectedWins) %>%
+  select(-c(potentialWins)) %>%
+  mutate(expectedWins = round(expectedWins, 2), diference = round(diference, 2)) %>%
+  arrange(desc(expectedWins))
+names(datWeekWins) <-  c("Team", "Week Wins", "Actual Wins", "Expected Wins", "Actual Wins - Expected Wins")
+
+```
+
+```{r week_wins, echo=FALSE}
+  DT::datatable(datWeekWins)
+```
+
 ## Pythagorean Wins Analysis
 
 This analysis tries to calculate expected wins as a function of points for, and a proxy for points against. The exponent used is 13.91.
-
 
 ```{r pythagorean_analysis, include=FALSE}
 butme <- function(x, team) {
@@ -261,8 +287,8 @@ pyThagStats <- dat %>% group_by(owner) %>% summarize(points = sum(points), wins 
   mutate(expectedWins = winratio*currentWeek) %>%
   mutate(difference = wins - expectedWins) %>%
   select(-c(points, proxy, winratio)) %>%
-  mutate(expectedWins = round(expectedWins, 2), difference = round(difference, 2))
-
+  mutate(expectedWins = round(expectedWins, 2), difference = round(difference, 2)) %>%
+  arrange(desc(expectedWins))
 names(pyThagStats) <- c("Team", "Actual Wins", "Expected Wins", "Actual Wins - Expected Wins")
 
 rm(againstProxies)
@@ -271,34 +297,6 @@ rm(againstProxies)
 
 ```{r allscheds3, echo=FALSE}
   DT::datatable(pyThagStats)
-```
-
-## Total Wins Approach
-
-This approach sums, for each week, how many other teams you would have beaten. A team's expected win percentage is then calculated as the number of actual possible wins, divided by the maximum number of possible wins possible, 9*number of weeks.
-
-
-```{r total_week_wins, include=FALSE}
-############################ x
-### Checking Total Week Wins
-############################ x  
-
-head(dat) 
-datWeekWins <- dat %>% group_by(week) %>% 
-  mutate(nwins = order(order(points, decreasing = FALSE))-1) %>%
-  ungroup %>% group_by(owner) %>% summarise(weekwins = sum(nwins), wins = sum(winner)) %>%
-  mutate(potentialWins = currentWeek*9, expectedWins = (weekwins/potentialWins)*currentWeek) %>%
-  mutate(diference = wins - expectedWins) %>%
-  select(-c(potentialWins)) %>%
-  mutate(expectedWins = round(expectedWins, 2), diference = round(diference, 2))
-
-names(datWeekWins) <-  c("Team", "Week Wins", "Actual Wins", "Expected Wins", "Actual Wins - Expected Wins")
-
-```
-
-
-```{r week_wins_table, echo=FALSE}
-  DT::datatable(datWeekWins)
 ```
 
 
@@ -327,8 +325,9 @@ maxMinTable <- allResults %>%
   merge(allResults) %>%
   filter(nWins == minWins | nWins == maxWins) %>%
   mutate(minOrMax = ifelse(nWins == minWins, "min", "max")) %>%
-  select(-c(nWins, teamID)) %>%
-  reshape(timevar = "minOrMax", idvar = c("owner", "minWins", "maxWins"), direction = "wide")
+  select(-c(nWins, teamID, ID, teamID)) %>%
+  reshape(timevar = "minOrMax", idvar = c("owner", "minWins", "maxWins"), direction = "wide") %>%
+  arrange(desc(maxWins),desc(nResults.max))
 names(maxMinTable) <-  c("Team", "Min Wins Possible", "Max Wins Possible", "# Min", "# Max")
 
 rm(allResults)
