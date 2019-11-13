@@ -6,15 +6,15 @@ output: html_document
 
 # Week `r REPORTNO`
 
-[Week 1](https://lvzwilson1.github.io/weekly_ranking_1.html)
-[Week 2](https://lvzwilson1.github.io/weekly_ranking_2.html)
-[Week 3](https://lvzwilson1.github.io/weekly_ranking_3.html)
-[Week 4](https://lvzwilson1.github.io/weekly_ranking_4.html)
-[Week 5](https://lvzwilson1.github.io/weekly_ranking_5.html)
-[Week 6](https://lvzwilson1.github.io/weekly_ranking_6.html)
-[Week 7](https://lvzwilson1.github.io/weekly_ranking_7.html)
-[Week 8](https://lvzwilson1.github.io/weekly_ranking_8.html)
-[Week 9](https://lvzwilson1.github.io/weekly_ranking_9.html)
+[Week 1](https://lvzwilson1.github.io/weekly_report_1.html)
+[Week 2](https://lvzwilson1.github.io/weekly_report_2.html)
+[Week 3](https://lvzwilson1.github.io/weekly_report_3.html)
+[Week 4](https://lvzwilson1.github.io/weekly_report_4.html)
+[Week 5](https://lvzwilson1.github.io/weekly_report_5.html)
+[Week 6](https://lvzwilson1.github.io/weekly_report_6.html)
+[Week 7](https://lvzwilson1.github.io/weekly_report_7.html)
+[Week 8](https://lvzwilson1.github.io/weekly_report_8.html)
+[Week 9](https://lvzwilson1.github.io/weekly_report_9.html)
 [Week 10](https://lvzwilson1.github.io/index.html)
 
 ```{r setup, include=FALSE}
