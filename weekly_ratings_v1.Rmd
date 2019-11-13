@@ -27,7 +27,7 @@ knitr::opts_chunk$set(echo = TRUE)
 keep(REPORTNO, thisWeek, sure = TRUE)
 
 currentWeek = REPORTNO
-simulate.schedules = 0
+simulate.schedules = ifelse(currentWeek==10,1,0)
 import.player.data = 1
 
 
@@ -209,22 +209,25 @@ if (simulate.schedules == 1) {
   all.sched <- inner_join(all.sched, scores)
   all.sched <- mutate(all.sched, winner = ifelse(points > oppPoints, 1, 0))
 
-  leagueDatttt <- leagueDat %>% rename(teamID=ID)
 
-  ## collapse results at schedule level
-  allSchedSum <- all.sched %>% group_by(nschedule, teamID) %>% 
-    summarize(nWins = sum(winner)) %>% ungroup %>% mutate(count = 1)
-  
-  ## collapse results at team level
-  allResults <- allSchedSum %>% group_by(teamID, nWins) %>%
-    summarise(nResults = sum(count)) %>% merge(leagueDatttt)
-  
-  rm(allSchedSum, all.sched)
-  
-  saveRDS(allResults, "C:/Users/lvwilson/Desktop/fantasy/allsched.rds")
+  saveRDS(all.sched, "C:/Users/lvwilson/Desktop/fantasy/allsched.rds")
 } else {
-  allResults <- readRDS("C:/Users/lvwilson/Desktop/fantasy/allsched.rds")
+  all.sched <- readRDS("C:/Users/lvwilson/Desktop/fantasy/allsched.rds")
 }
+
+all.sched <- all.sched %>% filter(week <= currentWeek)
+
+leagueDatttt <- leagueDat %>% rename(teamID=ID)
+
+## collapse results at schedule level
+allSchedSum <- all.sched %>% group_by(nschedule, teamID) %>% 
+  summarize(nWins = sum(winner)) %>% ungroup %>% mutate(count = 1)
+
+## collapse results at team level
+allResults <- allSchedSum %>% group_by(teamID, nWins) %>%
+  summarise(nResults = sum(count)) %>% merge(leagueDatttt)
+
+#rm(allSchedSum, all.sched)
 
 
 ```
@@ -313,7 +316,7 @@ allResults <- allResults %>% select(-c(fullname)) %>% merge(forMerge)
 
 # faceted histogram of wins
 
-sp <- ggplot(allResults, aes(x=nWins, y =nResults)) + 
+betterName <- ggplot(allResults, aes(x=nWins, y =nResults)) + 
   geom_bar(stat = "identity") +
   facet_wrap(~owner, ncol = 2)
 
@@ -335,8 +338,8 @@ rm(allResults)
 ### Distribution of Wins over All Potential Schedules
 
 
-```{r allscheds, echo=FALSE}
-  print(sp)
+```{r betterName, echo=FALSE}
+  print(betterName)
 ```
 
 ### Max and Min Wins Possible

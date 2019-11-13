@@ -18,7 +18,7 @@ if (download.data == 1) py_run_file("C:/Users/lvwilson/Documents/GitHub/lvzwilso
 
 thisWeek = 10
 
-for (REPORTNO in 1:thisWeek) {
+for (REPORTNO in thisWeek:1) {
   
   OutFileName = ifelse(REPORTNO==thisWeek, 'index.html', paste0('weekly_report_',REPORTNO,'.html'))
   OutFileDir  = ifelse(REPORTNO==thisWeek, 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/',
