@@ -1,9 +1,21 @@
 ---
 title: "Yours in the Fantasy Analysis: Better Late Than Never"
 author: "Luke Wilson"
-date: "Week 10"
 output: html_document
 ---
+
+# Week `r REPORTNO`
+
+[Week 1](https://lvzwilson1.github.io/weekly_ranking_1.html)
+[Week 2](https://lvzwilson1.github.io/weekly_ranking_2.html)
+[Week 3](https://lvzwilson1.github.io/weekly_ranking_3.html)
+[Week 4](https://lvzwilson1.github.io/weekly_ranking_4.html)
+[Week 5](https://lvzwilson1.github.io/weekly_ranking_5.html)
+[Week 6](https://lvzwilson1.github.io/weekly_ranking_6.html)
+[Week 7](https://lvzwilson1.github.io/weekly_ranking_7.html)
+[Week 8](https://lvzwilson1.github.io/weekly_ranking_8.html)
+[Week 9](https://lvzwilson1.github.io/weekly_ranking_9.html)
+[Week 10](https://lvzwilson1.github.io/index.html)
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -11,26 +23,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r data_import, include=FALSE}
-rm(list = ls())
 
-library(httr)
-library(magrittr)
-library(jsonlite)
-library(dplyr)
-library(combinat)
-library(ggplot2)
-library(ggalt)
-library(knitr)
-library(reticulate)
-library(tidyr)
-library(scales)
+keep(REPORTNO, thisWeek, sure = TRUE)
 
-currentWeek = 10
+currentWeek = REPORTNO
 simulate.schedules = 0
-import.player.data = 0
-download.data      = 0
+import.player.data = 1
 
-if (download.data == 1) py_run_file("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/data_down_loader.py")
 
 ##########################x
 ## Matchup Scoring Data
