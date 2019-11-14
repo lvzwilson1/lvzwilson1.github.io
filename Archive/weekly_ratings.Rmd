@@ -20,36 +20,58 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(fig.align = 'center')
+
+keep(
+  dat.MASTER,
+  leagueDat.MASTER,
+  playerscoresDat.MASTER,
+  lineUps.MASTER,
+  all.sched.MASTER,
+  thisWeek,
+  REPORTNO,
+  rMarkdownWeeklyScript,
+  sure = TRUE
+)
+
+currentWeek <- REPORTNO
+
+barbbellTheme <-  theme(plot.title = element_text(hjust=0.5, face="bold"),
+                        plot.background=element_rect(fill="#f7f7f7"),
+                        panel.background=element_rect(fill="#f7f7f7"),
+                        panel.grid.minor=element_blank(),
+                        panel.grid.major.y=element_blank(),
+                        panel.grid.major.x=element_line(),
+                        axis.ticks=element_blank(),
+                        legend.position="top",
+                        panel.border=element_blank())
+
 ```
 
 
 ```{r data_import, include=FALSE}
-## Filter down each data set into the appropriate subset of 
-
-keep(dat.MASTER,     leagueDat.MASTER, playerscoresDat.MASTER, 
-     lineUps.MASTER, all.sched.MASTER, thisWeek, REPORTNO, rMarkdownWeeklyScript,
-     sure = TRUE)
-
-currentWeek     <- REPORTNO
-
-leagueDat       <- leagueDat.MASTER       
-
+## Filter down each data set into the appropriate subset of weeks
+leagueDat       <- leagueDat.MASTER
 dat             <- dat.MASTER             %>% filter(week <= currentWeek)
 lineUps         <- lineUps.MASTER         %>% filter(week <= currentWeek)
 playerscoresDat <- playerscoresDat.MASTER %>% filter(week <= currentWeek)
+all.sched       <- all.sched.MASTER       %>% filter(week <= currentWeek)
 
 leagueDatttt <- leagueDat %>% rename(teamID=ID)
 
-all.sched <- all.sched.MASTER %>% filter(week <= currentWeek)
 
 ## collapse results at schedule level
-allSchedSum <- all.sched %>% group_by(nschedule, teamID) %>% 
-  summarize(nWins = sum(winner)) %>% ungroup %>% mutate(count = 1)
+allSchedSum <- all.sched %>%
+  group_by(nschedule, teamID) %>%
+  summarize(nWins = sum(winner)) %>% 
+  ungroup %>%
+  mutate(count = 1)
+
 
 ## collapse results at team level
-allResults <- allSchedSum %>% group_by(teamID, nWins) %>%
-  summarise(nResults = sum(count)) %>% merge(leagueDatttt)
-
+allResults <- allSchedSum %>%
+  group_by(teamID, nWins) %>%
+  summarise(nResults = sum(count)) %>%
+  merge(leagueDatttt)
 
 ```
 
@@ -63,16 +85,29 @@ This approach sums, for each week, how many other teams you would have beaten. A
 ### Checking Total Week Wins
 ############################ x  
 
-head(dat) 
-datWeekWins <- dat %>% group_by(week) %>% 
-  mutate(nwins = order(order(points, decreasing = FALSE))-1) %>%
-  ungroup %>% group_by(owner) %>% summarise(weekwins = sum(nwins), wins = sum(winner)) %>%
-  mutate(potentialWins = currentWeek*9, expectedWins = (weekwins/potentialWins)*currentWeek) %>%
+datWeekWins <- dat %>%
+  # Generate number of weekwins per week for each team
+  group_by(week) %>%
+  mutate(nwins = order(order(points, decreasing = FALSE)) - 1) %>%
+  ungroup %>% group_by(owner) %>%
+  
+  # Sum the week wins for each team
+  summarise(weekwins = sum(nwins), wins = sum(winner)) %>%
+  
+  # Generate expected wins and difference between actual and expected
+  mutate(potentialWins = currentWeek * 9,
+         expectedWins  = (weekwins / potentialWins) * currentWeek) %>%
   mutate(diference = wins - expectedWins) %>%
+ 
+  # Format resutls
   select(-c(potentialWins)) %>%
-  mutate(expectedWins = round(expectedWins, 2), diference = round(diference, 2)) %>%
+  mutate(expectedWins = round(expectedWins, 2),
+         diference    = round(diference,    2)) %>%
   arrange(desc(expectedWins))
-names(datWeekWins) <-  c("Team", "Week Wins", "Actual Wins", "Expected Wins", "Actual Wins - Expected Wins")
+
+  # Name Columns
+  names(datWeekWins) <-  c("Team", "Week Wins", "Actual Wins", "Expected Wins", 
+                           "Actual Wins - Expected Wins")
 
 ```
 
@@ -83,6 +118,7 @@ names(datWeekWins) <-  c("Team", "Week Wins", "Actual Wins", "Expected Wins", "A
 ## Pythagorean Wins Analysis
 
 ```{r pythagorean_analysis, include=FALSE}
+## Function to return average points for all teams except a given team
 butme <- function(x, team) {
   x %>%
     group_by(owner) %>% 
@@ -92,25 +128,35 @@ butme <- function(x, team) {
 }
 
 ## create dataframe of average of teams except for a team's points for
-teams <- unique(dat$owner)
-against.proxy <- vector(length = length(teams))
+against.proxy <- vector(length = length(unique(dat$owner)))
+for (i in 1:length(unique(dat$owner))) against.proxy[i] <- butme(dat, unique(dat$owner)[i])
+againstProxies <- data.frame(owner = unique(dat$owner), proxy= against.proxy)
 
-for (i in 1:length(teams)) {
-  against.proxy[i] <- butme(dat, teams[i])
-}
-
+## Power for calculation
 f = 13.91
 
-againstProxies <- data.frame(owner = teams, proxy= against.proxy)
-pyThagStats <- dat %>% group_by(owner) %>% summarize(points = sum(points), wins = sum(winner)) %>% 
+## Create Table
+pyThagStats <- dat %>% 
+  # Get total points for each owner
+  group_by(owner) %>% 
+  summarize(points = sum(points), wins = sum(winner)) %>% 
+  
+  # Merge on average points against proxy
   merge(againstProxies) %>%
+  
+  # Calculate expected wins and difference
   mutate(winratio = points^f/(points^f + proxy^f)) %>%
   mutate(expectedWins = winratio*currentWeek) %>%
   mutate(difference = wins - expectedWins) %>%
+  
+  # Formatting
   select(-c(points, proxy, winratio)) %>%
   mutate(expectedWins = round(expectedWins, 2), difference = round(difference, 2)) %>%
   arrange(desc(expectedWins))
-names(pyThagStats) <- c("Team", "Actual Wins", "Expected Wins", "Actual Wins - Expected Wins")
+  
+  # Name Columns
+  names(pyThagStats) <- c("Team", "Actual Wins", "Expected Wins", 
+                          "Actual Wins - Expected Wins")
 
 rm(againstProxies)
 ```
@@ -132,26 +178,37 @@ Our league is setup so that each team plays each of the other 9 teams once durin
 ### Simulate All Schedules Analysis
 ############################ x 
 
-forMerge <- leagueDat %>% select(-c(fullname))
+forMerge   <- leagueDat  %>% select(-c(fullname))
 allResults <- allResults %>% select(-c(fullname)) %>% merge(forMerge)
 
-# faceted histogram of wins
 
+## Faceted histogram of wins
 betterName <- ggplot(allResults, aes(x=nWins, y =nResults)) + 
   geom_bar(stat = "identity") +
   facet_wrap(~owner, ncol = 2)
 
+
 ## max/min table
 maxMinTable <- allResults %>%
+  # Min and Max Wins by Owner
   group_by(owner) %>%
-  summarise(minWins = min(nWins), maxWins = max(nWins)) %>%
+  summarise(minWins = min(nWins), 
+            maxWins = max(nWins)) %>%
+  
+  # Merge on number of schedules with each result
   merge(allResults) %>%
   filter(nWins == minWins | nWins == maxWins) %>%
   mutate(minOrMax = ifelse(nWins == minWins, "min", "max")) %>%
+  
+  # Formatting
   select(-c(nWins, teamID, ID, teamID)) %>%
-  reshape(timevar = "minOrMax", idvar = c("owner", "minWins", "maxWins"), direction = "wide") %>%
+  reshape(timevar = "minOrMax", 
+          idvar = c("owner", "minWins", "maxWins"), 
+          direction = "wide") %>%
   arrange(desc(maxWins),desc(nResults.max))
-names(maxMinTable) <-  c("Team", "Min Wins Possible", "Max Wins Possible", "# Min", "# Max")
+  
+  # Name Columns
+  names(maxMinTable) <-  c("Team", "Min Wins Possible", "Max Wins Possible", "# Min", "# Max")
 
 rm(allResults)
 ```
@@ -180,48 +237,71 @@ This table shows, for each team, the maximum number of wins and the minimum numb
 ### Start sit analysis
 ############################ x
 
-## Analysis
-# Total Lost Points and average maxscore
-merged2 <- lineUps %>% mutate(lostPoints = ActualMax - points) %>% group_by(owner) %>% 
-  summarise(lostPoints = sum(lostPoints), avgOpt = mean(ActualMax), avgPoints = mean(points)) %>% mutate(lostPoints = lostPoints/currentWeek) %>%
-  mutate(lostPoints = round(lostPoints, 2), avgOpt = round(avgOpt, 2), avgPoints = round(avgPoints, 2)) %>%
+## Total Lost Points and average maxscore
+merged2 <- lineUps %>% 
+  # Generate Lost Points - i.e. difference between Actual Score and Max Possible
+  mutate(lostPoints = ActualMax - points) %>% 
+  
+  # Summary of Stats per Team
+  group_by(owner) %>% 
+  summarise(lostPoints = mean(lostPoints), 
+            avgOpt = mean(ActualMax), 
+            avgPoints = mean(points)) %>% 
+  
+  # Format results
+  mutate(lostPoints = round(lostPoints, 2), 
+         avgOpt = round(avgOpt, 2), 
+         avgPoints = round(avgPoints, 2)) %>%
   arrange(lostPoints)
-names(merged2) <- c("Team", "Average Lost Points", "Average Optimal Points", "Average Points")
+  
+  # Name Columns
+  names(merged2) <- c("Team", "Average Lost Points", "Average Optimal Points", "Average Points")
 
-# Who has perfect weeks?
+  
+## Who has perfect weeks?
 perfectWeeks = lineUps %>% filter(ActualMax == points) 
 
-# Barbell plot
-dattt <- lineUps %>%  
-  group_by(owner) %>% summarise(avgPoints = mean(points), avgOpt = mean(ActualMax)) %>% 
-  arrange(desc(avgPoints))
-dattt$owner <- factor(dattt$owner, levels=as.character(dattt$owner)) 
 
-gg <- ggplot(dattt, aes(x=avgPoints, xend=avgOpt, y=owner, group=owner)) + 
+## Barbell plot data munging 
+dattt <- lineUps %>%  
+  group_by(owner) %>% 
+  summarise(avgPoints = mean(points), 
+            avgOpt = mean(ActualMax)) %>% 
+  arrange(desc(avgPoints))
+
+  # Save Owners as Factor for Plot Sorting
+  dattt$owner <- factor(dattt$owner, levels=as.character(dattt$owner)) 
+
+
+  # Plot 
+  gg <- ggplot(dattt, aes(x=avgPoints, xend=avgOpt, y=owner, group=owner)) + 
   geom_dumbbell(color="#a3c4dc", 
                 size=2,
                 colour_x = "blue",
                 colour_xend = "blue",
                 show.legend = TRUE) + 
-  labs(x=NULL, 
-       y=NULL, 
-       title="Average Actual Points vs. Possible Points")  +
-  theme(plot.title = element_text(hjust=0.5, face="bold"),
-        plot.background=element_rect(fill="#f7f7f7"),
-        panel.background=element_rect(fill="#f7f7f7"),
-        panel.grid.minor=element_blank(),
-        panel.grid.major.y=element_blank(),
-        panel.grid.major.x=element_line(),
-        axis.ticks=element_blank(),
-        legend.position="top",
-        panel.border=element_blank())
+  labs(x=NULL, y=NULL, title="Average Actual Points vs. Possible Points") + 
+  barbbellTheme
 
-# Optimal Lineup records
-oppLineUps <- lineUps %>% select(week, ID, ActualMax) %>% rename(oppID = ID, oppMaxScore = ActualMax) 
-mergdOppScore <- lineUps %>% inner_join(oppLineUps) %>% mutate(optWinner = ifelse(ActualMax > oppMaxScore, 1, 0)) %>%
-  group_by(owner) %>% summarize(winsOptimal = sum(optWinner), actualWins = sum(winner)) %>%
+
+## Optimal Lineup records - If everyone played optimal lineups
+oppLineUps <- lineUps %>% 
+  select(week, ID, ActualMax) %>% 
+  rename(oppID = ID, oppMaxScore = ActualMax) 
+
+  mergdOppScore <- lineUps %>% 
+  # Merge on oppponent optimal score
+  inner_join(oppLineUps) %>% 
+  
+  # Identify how many wins each team would get
+  mutate(optWinner = ifelse(ActualMax > oppMaxScore, 1, 0)) %>%
+  group_by(owner) %>% 
+  summarize(winsOptimal = sum(optWinner), 
+            actualWins = sum(winner)) %>%
   mutate(difference = winsOptimal - actualWins)
-names(mergdOppScore) <- c("Team", "Optimal Lineup Wins", "Actual Wins", "Optimal - Actual Wins")
+  
+  # Name Columns
+  names(mergdOppScore) <- c("Team", "Optimal Lineup Wins", "Actual Wins", "Optimal - Actual Wins")
 ```
 
 ### Optimal Records
@@ -248,9 +328,16 @@ This section of analysis concerns projections.
 
 ```{r actual_vs_projection, echo=FALSE}
 
-ratingsWhores <- lineUps %>% mutate(espnVsOwner = if_else(points == ProjScore, "Equal to ESPN", 
-                                                  if_else(points > ProjScore, "Beat ESPN", "ESPN Better"))) %>%
-  mutate(count = 1) %>% group_by(owner, espnVsOwner) %>% summarise(nTimes = sum(count)) %>% 
+## Who follows projections? Who Beats/Loses to them?
+ratingsWhores <- lineUps %>% 
+  # Get number of times of each result per owner
+  mutate(espnVsOwner = if_else(points == ProjScore, "Equal to ESPN", 
+                       if_else(points > ProjScore, "Beat ESPN", "ESPN Better"))) %>%
+  mutate(count = 1) %>% 
+  group_by(owner, espnVsOwner) %>% 
+  summarise(nTimes = sum(count)) %>% 
+  
+  # Reshape data & format for output
   spread(espnVsOwner, nTimes) %>% 
   mutate(`Equal to ESPN` = ifelse(is.na(`Equal to ESPN`),0,`Equal to ESPN`),
          `Beat ESPN`     = ifelse(is.na(`Beat ESPN`),    0,`Beat ESPN`),
@@ -258,18 +345,32 @@ ratingsWhores <- lineUps %>% mutate(espnVsOwner = if_else(points == ProjScore, "
   arrange(desc(`Equal to ESPN`)) %>%
   rename(Team = owner) 
 
+
+## Number of Wins if following ESPN lineups
 espnVsOwner <- lineUps %>% 
-  group_by(owner) %>% summarize(espnWins = sum(espnWinner), ownerWins = sum(winner)) %>% 
-  mutate(difference = espnWins - ownerWins) %>% arrange(desc(difference))
-names(espnVsOwner) <- c("Team", "ESPN Wins", "Actual Wins", "ESPN - Actual Wins")
+  group_by(owner) %>% 
+  summarize(espnWins = sum(espnWinner), 
+            ownerWins = sum(winner)) %>% 
+  mutate(difference = espnWins - ownerWins) %>% 
+  arrange(desc(difference))
+  
+  # name Columns
+  names(espnVsOwner) <- c("Team", "ESPN Wins", "Actual Wins", "ESPN - Actual Wins")
 
-# Barbell plot
+  
+## Barbell plot - ESPN lineups vs actual lineups
 dattt <- lineUps %>% 
-  group_by(owner) %>% summarise(avgPoints = mean(points), avgESPN = mean(ProjScore)) %>% 
+  # Summarize number of ESPN wins and actual wins
+  group_by(owner) %>% 
+  summarise(avgPoints = mean(points), 
+            avgESPN = mean(ProjScore)) %>% 
   arrange(desc(avgPoints))
-dattt$owner <- factor(dattt$owner, levels=as.character(dattt$owner)) 
-
-gg <- ggplot(dattt, aes(x=avgPoints, xend=avgESPN, y=owner, group=owner)) + 
+  
+  # Name owners as factors for plot sort
+  dattt$owner <- factor(dattt$owner, levels=as.character(dattt$owner)) 
+  
+  # Plot data
+  gg <- ggplot(dattt, aes(x=avgPoints, xend=avgESPN, y=owner, group=owner)) + 
   geom_dumbbell(color="#a3c4dc", 
                 size=2,
                 colour_x = "blue",
@@ -278,15 +379,7 @@ gg <- ggplot(dattt, aes(x=avgPoints, xend=avgESPN, y=owner, group=owner)) +
   labs(x=NULL, 
        y=NULL, 
        title="Owner Linups (Blue) vs. ESPN Lineups (Red)")  +
-  theme(plot.title = element_text(hjust=0.5, face="bold"),
-        plot.background=element_rect(fill="#f7f7f7"),
-        panel.background=element_rect(fill="#f7f7f7"),
-        panel.grid.minor=element_blank(),
-        panel.grid.major.y=element_blank(),
-        panel.grid.major.x=element_line(),
-        axis.ticks=element_blank(),
-        legend.position="top",
-        panel.border=element_blank())
+  barbbellTheme
 
 ```
 
@@ -322,19 +415,38 @@ Note that a teams WR1/RB1 is the WR/RB each week that scored the most points.
 
 ```{r positional_strength, echo=FALSE}
 
-actualScores <- playerscoresDat %>% filter(slotID == possSlots & slotID != 20) %>%
-  arrange(ID, slotID, week, desc(points)) %>% group_by(week, ID, slotID) %>% mutate(posNum = seq_along(points)) %>%
-  ungroup %>% group_by(ID, slotID, posNum) %>% summarise(avgPoints = mean(points)) %>%
+## Table of average points per position per team
+actualScores <- playerscoresDat %>% 
+  # Filter lineups to those who played
+  filter(slotID == possSlots & slotID != 20) %>%
+  
+  # identify RB/WR 1 vs 2
+  arrange(ID, slotID, week, desc(points)) %>% 
+  group_by(week, ID, slotID) %>% 
+  mutate(posNum = seq_along(points)) %>%
+  ungroup %>% 
+  
+  # Summarize average points
+  group_by(ID, slotID, posNum) %>% 
+  summarise(avgPoints = mean(points)) %>%
+  
+  # Join on owner and position data
   inner_join(leagueDat, by = "ID") %>%
   mutate(position = ifelse(slotID == 2 & posNum == 1, "RB1", ifelse(slotID == 2 & posNum == 2, "RB2",
                     ifelse(slotID == 4 & posNum == 1, "WR1", ifelse(slotID == 4 & posNum == 2, "WR2",
                     ifelse(slotID == 0, "QB",                ifelse(slotID == 6,  "TE",
                     ifelse(slotID == 16, "DST",              ifelse(slotID == 17, "K",
                     ifelse(slotID == 23, "FLEX", "")))))))))) %>% 
-  ungroup %>% select(c(owner, position, avgPoints)) %>%
-  group_by(position) %>% mutate(avgPosPoints = mean(avgPoints)) %>%
+  ungroup %>% 
+  select(c(owner, position, avgPoints)) %>%
+  
+  # average points per postion across teams
+  group_by(position) %>% 
+  mutate(avgPosPoints = mean(avgPoints)) %>%
   mutate(pointsOverAvg = round(100*(avgPoints - avgPosPoints)/avgPosPoints,0))
 
+
+## Table of points per position - all formatting basically
 pointsByPosTab <- actualScores %>%
   select(c(owner, position, avgPoints)) %>%
   mutate(avgPoints = round(avgPoints, 2)) %>%
@@ -342,9 +454,11 @@ pointsByPosTab <- actualScores %>%
   rename(Owner = owner) %>%
   mutate(Total = QB+WR1+WR2+RB1+RB2+TE+DST+K+FLEX) %>%
   arrange(desc(Total))
-  
+
+## Max value for plot scale
 maxValue <- max(abs(actualScores$pointsOverAvg))
 
+## Grid plot
 ggg <- ggplot(actualScores, aes(owner, position, fill = pointsOverAvg)) + 
   geom_tile(colour = "white") + 
   geom_text(aes(label=pointsOverAvg)) +

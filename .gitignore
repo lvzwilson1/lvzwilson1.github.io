@@ -1,14 +1,2 @@
-### cookie files
-Cookies/
-
-### data folder
-Data/
-
-### Folder containing other scripts
-other_analyses/
-
-### for now
-weekly_analyses/
-
-## for obv reasons 
-Archive/
+### Ignore this folder
+Ignore/

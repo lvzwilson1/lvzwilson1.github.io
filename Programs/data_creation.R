@@ -4,27 +4,33 @@ currentWeek = thisWeek
 simulate.schedules = 1
 import.player.data = 1
 
+
+
+
 ##########################x
 ## Matchup Scoring Data
 ##########################x
-mMatchupView = fromJSON("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Data/mMatchup.txt")
+mMatchupView = fromJSON("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Data/mMatchup.txt")
 
 dat = data.frame(week       = mMatchupView$schedule$matchupPeriodId,
                  awayPoints = mMatchupView$schedule$away$totalPoints,
                  awayID     = mMatchupView$schedule$away$teamId,
                  homePoints = mMatchupView$schedule$home$totalPoints,
                  homeID     = mMatchupView$schedule$home$teamId) %>%
-      filter(currentWeek >= week) %>% group_by(week) %>% mutate(matchupID = row_number())
+      group_by(week) %>% mutate(matchupID = row_number())
 
 awayResults <- rename(dat,points = awayPoints, oppPoints = homePoints, ID = awayID, oppID = homeID)
 homeResults <- rename(dat,points = homePoints, oppPoints = awayPoints, ID = homeID, oppID = awayID)
 dat <- rbind(awayResults, homeResults)
 
+
+
+
 ##########################x
 ## League Overview Data - team names and owners
 ##########################x
 
-leagueData = fromJSON("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Data/leagueData.txt")
+leagueData = fromJSON("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Data/leagueData.txt")
 
 leagueDat.MASTER = data.frame(ID = leagueData$teams$id,
                        loca = leagueData$teams$location,
@@ -39,6 +45,9 @@ leagueDat.MASTER = data.frame(ID = leagueData$teams$id,
 
 dat.MASTER <- dat <- merge(dat, leagueDat.MASTER) %>% mutate(winner = ifelse(points > oppPoints, 1, 0))
 
+
+
+
 ##########################x
 ## Boxscore Data
 ##########################x
@@ -46,7 +55,7 @@ weekList = vector(mode = "list", length = currentWeek)
 
 for (weeks in 1:currentWeek) {
   # read in weekly data
-  filename = paste0("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Data/boxscore2",weeks,".txt")
+  filename = paste0("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Data/boxscore2",weeks,".txt")
   boxscorejson = fromJSON(filename)
   teams <- vector(mode = "list", length = 5)
   
@@ -82,10 +91,8 @@ for (weeks in 1:currentWeek) {
       }
       
       homeandawayDats[[list]] <- plyr::rbind.fill(TeamPlayer)
-      print(paste(weeks,team,list))
     }
     teams[[team]] <- plyr::rbind.fill(homeandawayDats)
-    print(paste(weeks,team))
   }
   weekList[[weeks]] <- plyr::rbind.fill(teams) %>% mutate(week = weeks)
   print(paste(weeks))
@@ -97,6 +104,9 @@ playerscoresDat.MASTER = plyr::rbind.fill(weekList)
 #cleanup
 rm(teams, TeamPlayer, boxscorejson, leagueData, mMatchupView, mMatchupViews, 
    weekList, homeandawayDats, awayAndHomeList, awayResults, homeResults)
+
+
+
 
 ##########################x
 ## Best Lineups
@@ -160,6 +170,9 @@ table(lineUps.MASTER$espnWinner, lineUps.MASTER$winner)
 
 rm(bestLists, bestplayers, topFlexAct, topFlexProj, weeklylineups, lineups, temp, playerscoresDatt)
 
+
+
+
 ############################ x
 ### Simulate All Schedules....
 ############################ x  
@@ -173,14 +186,17 @@ for(i in 1:length(team_ids)) {
   teams.except <- team_ids[team_ids != teamID]
   schedules[[i]] <- combinat::permn(teams.except)
   nr = length(schedules[[i]])
+  
   for (j in 1:nr) {
     schedules[[i]][[j]] <- c(schedules[[i]][[j]], schedules[[i]][[j]][1:4]) 
   }
+  
   schedules[[i]] <- unlist(schedules[[i]])
   schedules[[i]] <- data.frame(teamID = team_ids[i], nschedule = rep(1:362880, each = 13),
                                week = rep(1:13, times = 362880), opponentID = schedules[[i]])
   print(i)
 }
+
 all.sched.MASTER = plyr::rbind.fill(schedules)
 all.sched.MASTER %<>% filter(week <= currentWeek)
 

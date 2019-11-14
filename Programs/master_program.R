@@ -18,16 +18,21 @@ download.data = 0
 thisWeek      = 10
 
 # Locations of sub-routines
-pythonDownloadScript = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/data_down_loader.py'
-rDataImportScript    = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/data_creation.R'
-rMarkdownWeeklyScript= 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/weekly_ratings.Rmd'
+rDataImportScript    = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Programs/data_creation.R'
+rMarkdownWeeklyScript= 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Programs/weekly_ratings.Rmd'
 
 # download data
-if (download.data==1) py_run_file(pythonDownloadScript)
+if (download.data==1) py_run_file('C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Programs/data_down_loader.py')
 
 # import data
 import.data = 1
 if (import.data==1)   source(rDataImportScript, local = TRUE)
+
+# Set up Lists to capture weekly results for overall page
+datWeekWins.LIST   <- vector(mode = "list", length = thisWeek)
+pyThagStats.LIST   <- vector(mode = "list", length = thisWeek)
+merged2.LIST       <- vector(mode = "list", length = thisWeek)
+ratingsWhores.LIST <- vector(mode = "list", length = thisWeek)
 
 # run report for all weeks
 for (REPORTNO in thisWeek:1) {
@@ -37,3 +42,7 @@ for (REPORTNO in thisWeek:1) {
   
   rmarkdown::render(rMarkdownWeeklyScript, output_file=OutFileName, output_dir=OutFileDir)
 }
+
+# Render overall report
+
+
