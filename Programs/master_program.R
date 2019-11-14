@@ -36,7 +36,7 @@ merged2.LIST       <- vector(mode = "list", length = thisWeek)
 ratingsWhores.LIST <- vector(mode = "list", length = thisWeek)
 
 # run report for all weeks
-for (REPORTNO in 10:thisWeek) {
+for (REPORTNO in 1:thisWeek) {
   
   OutFileName = ifelse(REPORTNO==thisWeek, 'index.html', paste0('weekly_report_',REPORTNO,'.html'))
   OutFileDir  = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io'

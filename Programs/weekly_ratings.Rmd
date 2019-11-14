@@ -1,6 +1,5 @@
 ---
-title: "Yours in the Fantasy Analysis: Better Late Than Never"
-author: "Luke Wilson"
+title: "Yours in the Fantasy Analysis: Week `r REPORTNO`"
 output: 
   html_document:
     code_folding: hide
@@ -9,14 +8,12 @@ output:
       after_body: footer.html
     toc: true
     toc_depth: 2
+    toc_float: true
     css: styles.css
 ---
 
-## Week `r REPORTNO`
-
 ```{r setup, echo=FALSE}
 knitr::opts_chunk$set(fig.align = 'center')
-
 
 keep(
   dat.MASTER,
@@ -45,6 +42,8 @@ barbbellTheme <-  theme(plot.title = element_text(hjust=0.5, face="bold"),
                         axis.ticks=element_blank(),
                         legend.position="top",
                         panel.border=element_blank())
+
+title = paste0("Yours in the Fantasy Analysis: Week ",REPORTNO)
 
 ```
 
