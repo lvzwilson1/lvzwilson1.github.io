@@ -12,6 +12,7 @@ library(reticulate) # For running python data download code
 library(tidyr)      # Several functions (spread)
 library(scales)     # For readusting scale on position plot
 library(gdata)      # For object cleanup keep function
+library(prettydoc)  # For rendering
 
 # Local Flags 
 download.data = 0
@@ -35,14 +36,11 @@ merged2.LIST       <- vector(mode = "list", length = thisWeek)
 ratingsWhores.LIST <- vector(mode = "list", length = thisWeek)
 
 # run report for all weeks
-for (REPORTNO in thisWeek:1) {
+for (REPORTNO in 1:thisWeek) {
   
   OutFileName = ifelse(REPORTNO==thisWeek, 'index.html', paste0('weekly_report_',REPORTNO,'.html'))
-  OutFileDir  = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io'
+  OutFileDir  = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/docs/'
   
   rmarkdown::render(rMarkdownWeeklyScript, output_file=OutFileName, output_dir=OutFileDir)
 }
-
-# Render overall report
-
 
