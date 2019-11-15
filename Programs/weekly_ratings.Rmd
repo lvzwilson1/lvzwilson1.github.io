@@ -42,8 +42,6 @@ barbbellTheme <-  theme(plot.title = element_text(hjust=0.5, face="bold"),
                         legend.position="top",
                         panel.border=element_blank())
 
-title = paste0("Yours in the Fantasy Analysis: Week ",REPORTNO)
-
 ```
 
 
@@ -112,9 +110,13 @@ datWeekWins.LIST[[currentWeek]] <- datWeekWins %>% mutate(reportNo = REPORTNO)
 ```
 
 
-```{r total_week_wins_table}
+```{r total_week_wins_table, , echo=FALSE}
   DT::datatable(datWeekWins, options = list(dom = 't'), rownames = F)
+```
 
+<br>
+
+```{r plotly_plot, echo=FALSE}
   if (REPORTNO == thisWeek) {
     ## Append the weekly datasets from the weekly reports
     datWeekWins.AllWeeks   <- plyr::rbind.fill(datWeekWins.LIST)
@@ -133,7 +135,7 @@ datWeekWins.LIST[[currentWeek]] <- datWeekWins %>% mutate(reportNo = REPORTNO)
 
 ```
 
-<br><br>
+<br>
 
 ## Pythagorean Wins Analysis
 
@@ -315,7 +317,7 @@ oppLineUps <- lineUps %>%
 
   mergdOppScore <- lineUps %>% 
   # Merge on oppponent optimal score
-  inner_join(oppLineUps) %>% 
+  merge(oppLineUps) %>% 
   
   # Identify how many wins each team would get
   mutate(optWinner = ifelse(ActualMax > oppMaxScore, 1, 0)) %>%
@@ -356,7 +358,40 @@ This table contains each teams records if they and their opponent played their o
 
 This section of analysis concerns projections.
 
-```{r actual_vs_projection}
+### Lineup Skill
+
+This plot contains the average score of the user set lineup, and the average score of the lineup that was projected by ESPN to score the most each week. 
+
+```{r actual_vs_projection.3}
+## Barbell plot - ESPN lineups vs actual lineups
+lineUps %>% 
+  # Summarize number of ESPN wins and actual wins
+  group_by(owner) %>% 
+  summarise(avgPoints = mean(points), 
+            avgESPN = mean(ProjScore)) %>% 
+  arrange(desc(avgPoints)) %>% 
+  mutate(owner = factor(.$owner, levels=as.character(.$owner))) %>%
+  ggplot(aes(x=avgPoints, xend=avgESPN, y=owner, group=owner)) + 
+  geom_dumbbell(color="#a3c4dc", 
+                size=2,
+                colour_x = "blue",
+                colour_xend = "red",
+                show.legend = TRUE) + 
+  labs(x=NULL, 
+       y=NULL, 
+       title="Owner Linups (Blue) vs. ESPN Lineups (Red)")  +
+  barbbellTheme
+
+```
+
+<br><br>
+
+### Who Follows Projections?
+
+This table containst the number of times that each team played the lineup that was projected by ESPN to score the most each week.
+
+
+```{r actual_vs_projection.1}
 
 ## Who follows projections? Who Beats/Loses to them?
 ratingsWhores <- lineUps %>% 
@@ -377,6 +412,17 @@ ratingsWhores <- lineUps %>%
 
 ratingsWhores.LIST[[currentWeek]] <- ratingsWhores %>% mutate(reportNo = REPORTNO)
 
+DT::datatable(ratingsWhores, options = list(dom = 't'), rownames = F)
+
+```
+
+<br><br>
+
+### Optimal Lineup Records
+
+This table contains each owners record if they started the lineup that was projected by ESPN to score the most each week.
+
+```{r actual_vs_projection.2}
 ## Number of Wins if following ESPN lineups
 espnVsOwner <- lineUps %>% 
   group_by(owner) %>% 
@@ -388,59 +434,9 @@ espnVsOwner <- lineUps %>%
   # name Columns
   names(espnVsOwner) <- c("Team", "ESPN Wins", "Actual Wins", "ESPN - Actual Wins")
 
-  
-## Barbell plot - ESPN lineups vs actual lineups
-dattt <- lineUps %>% 
-  # Summarize number of ESPN wins and actual wins
-  group_by(owner) %>% 
-  summarise(avgPoints = mean(points), 
-            avgESPN = mean(ProjScore)) %>% 
-  arrange(desc(avgPoints))
-  
-  # Name owners as factors for plot sort
-  dattt$owner <- factor(dattt$owner, levels=as.character(dattt$owner)) 
-  
-  # Plot data
-  gg <- ggplot(dattt, aes(x=avgPoints, xend=avgESPN, y=owner, group=owner)) + 
-  geom_dumbbell(color="#a3c4dc", 
-                size=2,
-                colour_x = "blue",
-                colour_xend = "red",
-                show.legend = TRUE) + 
-  labs(x=NULL, 
-       y=NULL, 
-       title="Owner Linups (Blue) vs. ESPN Lineups (Red)")  +
-  barbbellTheme
-
-```
-
-<br><br>
-
-### Lineup Skill
-
-This plot contains the average score of the user set lineup, and the average score of the lineup that was projected by ESPN to score the most each week. 
-
-```{r barbell_plot_espn, echo=FALSE}
-  print(gg)
-```
-
-<br><br>
-
-This table contains each owners record if they started the lineup that was projected by ESPN to score the most each week.
-
-```{r espnVsOwner, echo=FALSE}
   DT::datatable(espnVsOwner, options = list(dom = 't'), rownames = F)
 ```
 
-<br><br>
-
-### Who Follows Projections?
-
-This table containst the number of times that each team played the lineup that was projected by ESPN to score the most each week.
-
-```{r ratingsWhores, echo=FALSE}
-  DT::datatable(ratingsWhores, options = list(dom = 't'), rownames = F)
-```
 
 <br><br>
 
@@ -514,7 +510,7 @@ ggg <- ggplot(actualScores, aes(owner, position, fill = pointsOverAvg)) +
 
 <br><br>
 
-## Points Above Average by Position
+### Points Above Average by Position
 
 ```{r points_by_pos, echo=FALSE}
   print(ggg)
