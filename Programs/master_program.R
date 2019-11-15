@@ -13,6 +13,7 @@ library(tidyr)      # Several functions (spread)
 library(scales)     # For readusting scale on position plot
 library(gdata)      # For object cleanup keep function
 library(prettydoc)  # For rendering
+library(plotly)     # Pretty plot
 
 # Local Flags 
 download.data = 0

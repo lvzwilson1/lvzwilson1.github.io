@@ -1,10 +1,6 @@
 ---
 title: "Luke Wilson"
-output: 
-  html_document:
-    includes: 
-      in_header: sources.html
-      after_body: footer.html
+output: html_document
 ---
 
 ## Website
