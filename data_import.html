@@ -1588,9 +1588,6 @@ div.tocify {
 
 <div class="navbar navbar-default navbar-expand-lg navbar-light bg-light navbar-fixed-top" role="navigation">
   <div class="container">
-    <div class="navbar-header">
-      <a class="navbar-brand" href="http://lvzwilson1.github.io/index.html">Home</a>
-    </div>
     <div class="collapse navbar-collapse" id="navbar">
       <ul class="nav navbar-nav mr-auto">
         <li><a href="http://lvzwilson1.github.io/weekly_report_10.html">Fantasy Analysis Week 10</a></li>
@@ -1872,6 +1869,9 @@ table(lineUps.MASTER$espnWinner, lineUps.MASTER$winner)
 
 rm(bestLists, bestplayers, topFlexAct, topFlexProj, weeklylineups, lineups, temp, playerscoresDatt)</code></pre>
 <p><br></p>
+</div>
+<div id="simulating-all-schedules" class="section level3">
+<h3>Simulating All Schedules</h3>
 <pre class="r"><code>############################ x
 ### Simulate All Schedules....
 ############################ x  
@@ -1976,7 +1976,7 @@ $(document).ready(function ()  {
 
     // establish options
     var options = {
-      selectors: "h1,h2",
+      selectors: "h1,h2,h3",
       theme: "bootstrap3",
       context: '.toc-content',
       hashGenerator: function (text) {

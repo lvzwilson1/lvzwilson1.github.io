@@ -6,7 +6,7 @@ output:
       in_header: sources.html
       after_body: footer.html
     toc: true
-    toc_depth: 2
+    toc_depth: 3
     toc_float: true
 ---
 
@@ -275,6 +275,8 @@ rm(bestLists, bestplayers, topFlexAct, topFlexProj, weeklylineups, lineups, temp
 ```
 
 <br>
+
+### Simulating All Schedules
 
 ```{r analysis2, eval = FALSE}
 ############################ x
