@@ -38,7 +38,7 @@ ratingsWhores.LIST <- vector(mode = "list", length = thisWeek)
 # run report for all weeks
 for (REPORTNO in 10:thisWeek) {
   
-  OutFileName = ifelse(REPORTNO==thisWeek, 'index.html', paste0('weekly_report_',REPORTNO,'.html'))
+  OutFileName = paste0('weekly_report_',REPORTNO,'.html')
   OutFileDir  = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io'
   
   rmarkdown::render(rMarkdownWeeklyScript, output_file=OutFileName, output_dir=OutFileDir)
