@@ -1,6 +1,9 @@
 ---
 title: "Luke Wilson"
-output: html_document
+output: 
+  html_document:
+    includes: 
+      css: styles.css
 ---
 
 ## Website

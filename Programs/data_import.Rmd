@@ -5,6 +5,7 @@ output:
     includes: 
       in_header: sources.html
       after_body: footer.html
+      css: styles.css
     toc: true
     toc_depth: 3
     toc_float: true
