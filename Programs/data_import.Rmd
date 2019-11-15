@@ -1,0 +1,322 @@
+---
+title: "Gathering Data from ESPN's Undocumented API"
+output: 
+  html_document:
+    includes: 
+      in_header: sources.html
+      after_body: footer.html
+    toc: true
+    toc_depth: 2
+    toc_float: true
+---
+
+<style>
+pre {
+  overflow-x: auto;
+}
+pre code {
+  word-wrap: normal;
+  white-space: pre;
+}
+</style>
+
+## Overview
+
+I prepared a limited version of the 'Luck Rankings' for the 2018-2019 season. For this analysis I was mostly limited by the data I had available to me. I manually entered the score of each matchup into a csv and then ran analysis on those scores. This year, I wanted to do a richer level of analysis, at the player level. Therefore, I had to figure out how to programmatially get the data from the web. Luckily, there were a few reddit and blog posts that helped me out a lot (links to follow). The remainder of this post contains the code that I used to download and prepare the data. 
+
+## Python API Downloading 
+
+The following Python code downloads the API data into a text file which I will parse in R. 
+
+```{python, eval = FALSE}
+# imports
+import requests
+import json
+
+# set values
+url = "https://fantasy.espn.com/apis/v3/games/ffl/seasons/2019/segments/0/leagues/554351"
+
+# Get cookie values from secret file
+with open ("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Cookies/espn_s2.txt", "r") as myfile:
+    espn_s2=myfile.readlines()
+
+with open ("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Cookies/SWID.txt", "r") as myfile:
+    SWID=myfile.readlines()
+
+cookies = {"espn_s2": espn_s2[0], "SWID": SWID[0]}
+
+# get request - league Data
+r = requests.get(url, cookies=cookies)
+d = r.json()
+with open('C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Data/leagueData.txt', 'w') as outfile:
+    json.dump(d, outfile)
+
+# get request - mMatchup view
+reports = ["mMatchup", "mTeam", "mMatchupScore", "kona_player_info", "mSettings"]
+for report in reports:
+    r = requests.get(url, params = {"view": report}, cookies=cookies)
+    d = r.json()
+    filename = "C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Data/" + report + ".txt"
+    with open(filename, 'w') as outfile:
+        json.dump(d, outfile)
+
+# get request - boxscore2 (player level data - for each team)
+for weeks in range(1, 11):
+    r = requests.get(url + '?view=mMatchup&view=mMatchupScore', params={'scoringPeriodId': weeks, 'matchupPeriodId': weeks}, cookies=cookies)
+    d = r.json()
+    filename = "C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Data/boxscore2" + str(weeks) + ".txt"
+    with open(filename, 'w') as outfile:
+        json.dump(d, outfile)
+
+# get request - kona_view (player level data for the entire year, not team specific)
+for weeks2 in range(1, 11):
+    r = requests.get(url + '?view=kona_player_info', params={'scoringPeriodId': weeks2}, cookies=cookies)
+    d = r.json()
+    filename = "C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Data/kona_player_info_" + str(weeks2) + ".txt"
+    with open(filename, 'w') as outfile:
+        json.dump(d, outfile)
+
+```
+
+<br><br>
+
+## Data Munging 
+
+<br>
+
+### Matchup Score Data
+
+```{r data1, eval = FALSE}
+keep(thisWeek, rMarkdownWeeklyScript, sure = TRUE)
+
+currentWeek = 10 # The latest complete week in the season. 
+simulate.schedules = 1
+import.player.data = 1
+
+
+##########################x
+## Matchup Scoring Data
+##########################x
+mMatchupView = fromJSON("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Data/mMatchup.txt")
+
+dat = data.frame(week       = mMatchupView$schedule$matchupPeriodId,
+                 awayPoints = mMatchupView$schedule$away$totalPoints,
+                 awayID     = mMatchupView$schedule$away$teamId,
+                 homePoints = mMatchupView$schedule$home$totalPoints,
+                 homeID     = mMatchupView$schedule$home$teamId) %>%
+      group_by(week) %>% mutate(matchupID = row_number())
+
+awayResults <- rename(dat,points = awayPoints, oppPoints = homePoints, ID = awayID, oppID = homeID)
+homeResults <- rename(dat,points = homePoints, oppPoints = awayPoints, ID = homeID, oppID = awayID)
+dat <- rbind(awayResults, homeResults)
+
+```
+
+<br>
+
+### League Data
+
+```{r data2, eval = FALSE}
+##########################x
+## League Overview Data - team names and owners
+##########################x
+
+leagueData = fromJSON("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Data/leagueData.txt")
+
+leagueDat.MASTER = data.frame(ID = leagueData$teams$id,
+                       loca = leagueData$teams$location,
+                       name = leagueData$teams$nickname) %>%
+  mutate(fullname = paste(loca,name)) %>% select(-c(loca, name)) %>%
+  mutate(fullname = ifelse(ID == 4, "Are Bonita Fish Big?", fullname)) %>% # getting rid of roland's emoji
+  mutate(owner = ifelse(ID==1,  "Cameron",   ifelse(ID==3,  "KB",
+                 ifelse(ID==4,  "Roland",    ifelse(ID==7,  "Carter/Ale",
+                 ifelse(ID==9,  "Kolin",     ifelse(ID==10, "Luke",
+                 ifelse(ID==11, "Trainor",   ifelse(ID==15, "Tex",
+                 ifelse(ID==16, "Rich",      ifelse(ID==17, "KY","")))))))))))
+
+dat.MASTER <- dat <- merge(dat, leagueDat.MASTER) %>% mutate(winner = ifelse(points > oppPoints, 1, 0))
+```
+
+<br>
+
+### Boxscore Data
+
+```{r data3, eval = FALSE}
+##########################x
+## Boxscore Data
+##########################x
+weekList = vector(mode = "list", length = currentWeek)
+
+for (weeks in 1:currentWeek) {
+  # read in weekly data
+  filename = paste0("C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Data/boxscore2",weeks,".txt")
+  boxscorejson = fromJSON(filename)
+  teams <- vector(mode = "list", length = 5)
+  
+  for (team in 1:5) {
+    offset = (weeks - 1)*5
+    awayAndHomeList = list(as.list(boxscorejson$schedule$away$rosterForCurrentScoringPeriod$entries[[team+offset]]),
+                           as.list(boxscorejson$schedule$home$rosterForCurrentScoringPeriod$entries[[team+offset]]))
+    mMatchupViews =   list(mMatchupView$schedule$away,mMatchupView$schedule$home)
+    homeandawayDats = vector(mode = "list", length = 2)
+    
+    for (list in 1:2) {
+      teamID = mMatchupViews[[list]]$teamId[team+offset]
+      nPLayers = length(awayAndHomeList[[list]]$lineupSlotId)
+      TeamPlayer <- vector(mode= "list", length = nPLayers)
+      
+      for (playerNum in 1:nPLayers) {
+        ProjIndex <- which(awayAndHomeList[[list]]$playerPoolEntry$player$stats[[playerNum]]$statSourceId == 1)
+        
+        if (is.null(awayAndHomeList[[list]]$playerPoolEntry$player$stats[[playerNum]]$appliedTotal[ProjIndex]) | 
+            length(awayAndHomeList[[list]]$playerPoolEntry$player$stats[[playerNum]]$appliedTotal)==1) {
+          proj = 0
+        } else {
+          proj =    awayAndHomeList[[list]]$playerPoolEntry$player$stats[[playerNum]]$appliedTotal[ProjIndex] 
+        }
+        
+        TeamPlayer[[playerNum]] = data.frame(
+          slotID = awayAndHomeList[[list]]$lineupSlotId[playerNum],
+          points = awayAndHomeList[[list]]$playerPoolEntry$appliedStatTotal[playerNum],
+          name = awayAndHomeList[[list]]$playerPoolEntry$player$fullName[playerNum],
+          proj = proj, ID = teamID,
+          possSlots = awayAndHomeList[[list]]$playerPoolEntry$player$eligibleSlots[[playerNum]]
+        )  
+      }
+      
+      homeandawayDats[[list]] <- plyr::rbind.fill(TeamPlayer)
+    }
+    teams[[team]] <- plyr::rbind.fill(homeandawayDats)
+  }
+  weekList[[weeks]] <- plyr::rbind.fill(teams) %>% mutate(week = weeks)
+  print(paste(weeks))
+}
+
+# turn league wide list into league wide dataframe
+playerscoresDat.MASTER = plyr::rbind.fill(weekList) 
+
+#cleanup
+rm(teams, TeamPlayer, boxscorejson, leagueData, mMatchupView, mMatchupViews, 
+   weekList, homeandawayDats, awayAndHomeList, awayResults, homeResults)
+
+```
+
+<br><br>
+
+## Limited Analysis
+
+<br>
+
+### Best Optimal and Projected Linueps
+
+```{r analysis1, eval = FALSE}
+##########################x
+## Best Lineups
+##########################x
+
+'%ni%' <- Negate('%in%')
+usedSlots = unique(playerscoresDat.MASTER$slotID)
+teams = unique(playerscoresDat.MASTER$ID)
+weeks = unique(playerscoresDat.MASTER$week)
+playerscoresDatt <- playerscoresDat.MASTER %>% filter(possSlots %in% usedSlots & possSlots != 20) %>% mutate(name = as.character(name))
+
+lineups = vector(mode = "list", length = length(teams))
+
+for (team in teams) {
+  weeklylineups = vector(mode = "list", length = length(weeks))
+  
+  for (weeknum in 1:currentWeek) {
+    # duplicate data, need to loop over actual and proj best lineups
+    temp <- playerscoresDatt %>% filter(week == weeknum & ID == team) %>% rbind(.,.) %>% mutate(scoreType = rep(c(1,2), each = n()/2)) %>%
+      mutate(typeScore = ifelse(scoreType==1, points, proj))
+    
+    bestLists = vector(mode = "list", length = 6)
+    posis1 = c(0,6,16,17); posis2 = c(4,2)
+    
+    # positions with one slot - QB, TE, DST, K
+    for (posi in 1:length(posis1)) {
+      bestLists[[posi]]   <- temp %>% filter(possSlots==posis1[posi]) %>% group_by(scoreType) %>% 
+                                      arrange(desc(typeScore)) %>% slice(1)
+    }
+    
+    # positions with one slot - WR, RB
+    for (posi in 1:length(posis2)) {
+      bestLists[[posi+4]] <- temp %>% filter(possSlots==posis2[posi]) %>% group_by(scoreType) %>% 
+                                      arrange(desc(typeScore)) %>% slice(1:2)
+    }
+    
+    bestplayers <- plyr::rbind.fill(bestLists)
+    
+    # get top flex players -  by actual scores and projected scores
+    usedNamesAct  = bestplayers[bestplayers$possSlots %in% c(4,2,6) & bestplayers$scoreType == 1,3]
+    topFlexAct    <- temp %>% filter(name %ni% usedNamesAct & possSlots == 23 & scoreType == 1) %>%
+                              arrange(desc(typeScore)) %>% slice(1) 
+    
+    usedNamesProj = bestplayers[bestplayers$possSlots %in% c(4,2,6) & bestplayers$scoreType == 2,3]
+    topFlexProj   <- temp %>% filter(name %ni% usedNamesProj & possSlots == 23 & scoreType == 2) %>% 
+                              arrange(desc(typeScore)) %>% slice(1)
+    
+    # bind together dataframe of top players
+    weeklylineups[[weeknum]] = rbind(bestplayers, topFlexAct, topFlexProj)
+  }
+  
+  lineups[[which(teams == team)]] <- plyr::rbind.fill(weeklylineups)
+}
+
+lineUps.MASTER <- plyr::rbind.fill(lineups) %>% arrange(week, ID, scoreType, slotID) %>%
+  group_by(week, ID, scoreType) %>% summarize(maxScore = sum(points)) %>% ungroup %>% 
+  spread(scoreType, maxScore)   %>% rename(ActualMax="1", ProjScore="2") %>% inner_join(dat) %>%
+  mutate(espnWinner = ifelse(ProjScore > oppPoints,1,0))
+
+table(lineUps.MASTER$espnWinner, lineUps.MASTER$winner)
+
+rm(bestLists, bestplayers, topFlexAct, topFlexProj, weeklylineups, lineups, temp, playerscoresDatt)
+
+```
+
+<br>
+
+```{r analysis2, eval = FALSE}
+############################ x
+### Simulate All Schedules....
+############################ x  
+
+schedules <- vector(mode = "list", length = 10)
+team_ids <- unique(dat$ID)
+
+## Generate dataframe of all possible schedules
+for(i in 1:length(team_ids)) {
+  teamID <- team_ids[i]
+  teams.except <- team_ids[team_ids != teamID]
+  schedules[[i]] <- combinat::permn(teams.except)
+  nr = length(schedules[[i]])
+  
+  for (j in 1:nr) {
+    schedules[[i]][[j]] <- c(schedules[[i]][[j]], schedules[[i]][[j]][1:4]) 
+  }
+  
+  schedules[[i]] <- unlist(schedules[[i]])
+  schedules[[i]] <- data.frame(teamID = team_ids[i], nschedule = rep(1:362880, each = 13),
+                               week = rep(1:13, times = 362880), opponentID = schedules[[i]])
+  print(i)
+}
+
+all.sched.MASTER = plyr::rbind.fill(schedules)
+all.sched.MASTER %<>% filter(week <= currentWeek)
+
+rm(schedules)
+
+## merge on points scored by each team - takes forever
+scores         <- dat[,c("week", "ID", "points")] %>% rename(teamID=ID)
+scoresOpponent <- dat[,c("week", "ID", "points")] %>% rename(opponentID=ID, oppPoints = points)
+all.sched.MASTER <- inner_join(all.sched.MASTER, scoresOpponent) 
+all.sched.MASTER <- inner_join(all.sched.MASTER, scores)
+all.sched.MASTER <- mutate(all.sched.MASTER, winner = ifelse(points > oppPoints, 1, 0))
+  
+
+keep(dat.MASTER, leagueDat.MASTER, playerscoresDat.MASTER, lineUps.MASTER, 
+     all.sched.MASTER, thisWeek, rMarkdownWeeklyScript, sure = TRUE)
+
+```
+
+

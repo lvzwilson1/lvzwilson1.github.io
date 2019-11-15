@@ -36,10 +36,22 @@ merged2.LIST       <- vector(mode = "list", length = thisWeek)
 ratingsWhores.LIST <- vector(mode = "list", length = thisWeek)
 
 # run report for all weeks
-for (REPORTNO in 10:thisWeek) {
+for (REPORTNO in 1:thisWeek) {
   
   OutFileName = paste0('weekly_report_',REPORTNO,'.html')
   OutFileDir  = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io'
   
   rmarkdown::render(rMarkdownWeeklyScript, output_file=OutFileName, output_dir=OutFileDir)
 }
+
+index.file = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Programs/index.Rmd'
+rmarkdown::render(index.file, 
+                  output_file='index.html', 
+                  output_dir ='C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io')
+
+
+data.file = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Programs/data_import.Rmd'
+rmarkdown::render(data.file, 
+                  output_file='data_import.html', 
+                  output_dir ='C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io')
+
