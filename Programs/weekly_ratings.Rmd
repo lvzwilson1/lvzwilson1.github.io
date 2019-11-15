@@ -4,12 +4,10 @@ output:
   html_document:
     code_folding: hide
     includes: 
-      in_header: nav_bar.html
       after_body: footer.html
     toc: true
     toc_depth: 2
     toc_float: true
-    css: styles.css
 ---
 
 ```{r setup, echo=FALSE}
@@ -112,29 +110,29 @@ datWeekWins.LIST[[currentWeek]] <- datWeekWins %>% mutate(reportNo = REPORTNO)
 
 ```
 
-```{r total_week_wins_summary}
-
-if (REPORTNO == thisWeek) {
-  ## Append the weekly datasets from the weekly reports
-  datWeekWins.AllWeeks   <- plyr::rbind.fill(datWeekWins.LIST)
-  
-  weekWinsSummary <- datWeekWins.AllWeeks %>%
-    mutate("Expected Win Percent" = round(`Expected Wins`/reportNo,2)) %>%
-    rename(Week = reportNo) %>% 
-    ggplot(aes(x = Week, y = `Expected Win Percent`)) +
-    geom_line(aes(color=Team)) +
-    geom_point(aes(color=Team)) + 
-    scale_x_continuous(breaks=seq(0,currentWeek,1)) + 
-    ggtitle("Expected Win Percentage by Week: Total Week Wins")
-  
-  ggplotly(weekWinsSummary)
-}
-
-```
 
 ```{r total_week_wins_table}
   DT::datatable(datWeekWins, options = list(dom = 't'), rownames = F)
+
+  if (REPORTNO == thisWeek) {
+    ## Append the weekly datasets from the weekly reports
+    datWeekWins.AllWeeks   <- plyr::rbind.fill(datWeekWins.LIST)
+    
+    weekWinsSummary <- datWeekWins.AllWeeks %>%
+      mutate("Expected Win Percent" = round(`Expected Wins`/reportNo,2)) %>%
+      rename(Week = reportNo) %>% 
+      ggplot(aes(x = Week, y = `Expected Win Percent`)) +
+      geom_line(aes(color=Team)) +
+      geom_point(aes(color=Team)) + 
+      scale_x_continuous(breaks=seq(0,currentWeek,1)) + 
+      ggtitle("Expected Win Percentage by Week: Total Week Wins")
+    
+    ggplotly(weekWinsSummary)
+  }
+
 ```
+
+<br><br>
 
 ## Pythagorean Wins Analysis
 
@@ -188,6 +186,8 @@ pyThagStats.LIST[[currentWeek]] <- pyThagStats %>% mutate(reportNo = REPORTNO)
 DT::datatable(pyThagStats, options = list(dom = 't'), rownames = F)
 ```
 
+<br><br>
+
 ## All Schedules Simulated
 
 Our league is setup so that each team plays each of the other 9 teams once during the first 9 weeks of the season, and then replays the first 4 teams they played. There are 362,880 such possible schedules. 
@@ -239,6 +239,8 @@ rm(allResults)
   print(betterName)
 ```
 
+<br><br>
+
 ### Max and Min Wins Possible
 
 This table shows, for each team, the maximum number of wins and the minimum number of wins that each team could have achieved over all possible schedules. It also shows out of the 362880 possible schedules, how many times a team achieves that number of wins. 
@@ -247,6 +249,7 @@ This table shows, for each team, the maximum number of wins and the minimum numb
   DT::datatable(maxMinTable, options = list(dom = 't'), rownames = F)
 ```
 
+<br><br>
 
 ## Start/Sit Efficiency Analysis
 
@@ -332,15 +335,21 @@ This table contains each teams records if they and their opponent played their o
   DT::datatable(mergdOppScore, options = list(dom = 't'), rownames = F)
 ```
 
+<br><br>
+
 ### Average Points Left on Bench
 
 ```{r optimal_wins_table, echo=FALSE}
   DT::datatable(merged2, options = list(dom = 't'), rownames = F)
 ```
 
+<br><br>
+
 ```{r barbell_plot, echo=FALSE}
   print(gg)
 ```
+
+<br><br>
 
 ## Actuals vs Projections
 
@@ -404,6 +413,7 @@ dattt <- lineUps %>%
 
 ```
 
+<br><br>
 
 ### Lineup Skill
 
@@ -413,11 +423,15 @@ This plot contains the average score of the user set lineup, and the average sco
   print(gg)
 ```
 
+<br><br>
+
 This table contains each owners record if they started the lineup that was projected by ESPN to score the most each week.
 
 ```{r espnVsOwner, echo=FALSE}
   DT::datatable(espnVsOwner, options = list(dom = 't'), rownames = F)
 ```
+
+<br><br>
 
 ### Who Follows Projections?
 
@@ -427,6 +441,7 @@ This table containst the number of times that each team played the lineup that w
   DT::datatable(ratingsWhores, options = list(dom = 't'), rownames = F)
 ```
 
+<br><br>
 
 ## Positional Strengths and Weaknesses
 
@@ -496,9 +511,12 @@ ggg <- ggplot(actualScores, aes(owner, position, fill = pointsOverAvg)) +
   DT::datatable(pointsByPosTab, options = list(dom = 't'), rownames = F)
 ```
 
+<br><br>
+
 ## Points Above Average by Position
 
 ```{r points_by_pos, echo=FALSE}
   print(ggg)
 ```
 
+<br><br>
