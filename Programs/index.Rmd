@@ -7,3 +7,5 @@ output:
 ---
 
 ## Website
+
+Click on the 'Current Week' header to get to see links to previous weeks. 
