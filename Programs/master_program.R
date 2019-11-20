@@ -17,7 +17,7 @@ library(plotly)     # Pretty plot
 
 # Local Flags 
 download.data = 0
-thisWeek      = 10
+thisWeek      = 11
 
 # Locations of sub-routines
 rDataImportScript    = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Programs/data_creation.R'
