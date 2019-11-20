@@ -30,7 +30,7 @@ for report in reports:
         json.dump(d, outfile)
 
 # get request - boxscore2 (player level data - for each team)
-for weeks in range(1, 11):
+for weeks in range(1, 12):
     r = requests.get(url + '?view=mMatchup&view=mMatchupScore', params={'scoringPeriodId': weeks, 'matchupPeriodId': weeks}, cookies=cookies)
     d = r.json()
     filename = "C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Data/boxscore2" + str(weeks) + ".txt"
@@ -38,7 +38,7 @@ for weeks in range(1, 11):
         json.dump(d, outfile)
 
 # get request - kona_view (player level data for the entire year, not team specific)
-for weeks2 in range(1, 11):
+for weeks2 in range(1, 12):
     r = requests.get(url + '?view=kona_player_info', params={'scoringPeriodId': weeks2}, cookies=cookies)
     d = r.json()
     filename = "C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Ignore/Data/kona_player_info_" + str(weeks2) + ".txt"

@@ -12,8 +12,10 @@ output:
     toc_float: true
 ---
 
+
 ```{r setup, echo=FALSE}
 knitr::opts_chunk$set(fig.align = 'center')
+knitr::opts_chunk$set(fig.align = 'center',eval = FALSE)
 
 keep(
   dat.MASTER,
