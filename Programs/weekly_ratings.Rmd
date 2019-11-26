@@ -2,7 +2,6 @@
 title: "Yours in the Fantasy Analysis: Week `r REPORTNO`"
 output: 
   html_document:
-    code_folding: hide
     includes: 
       in_header: sources.html
       after_body: footer.html
@@ -15,6 +14,7 @@ output:
 
 ```{r setup, echo=FALSE}
 knitr::opts_chunk$set(fig.align = 'center')
+knitr::opts_chunk$set(echo = FALSE)
 
 keep(
   dat.MASTER,
