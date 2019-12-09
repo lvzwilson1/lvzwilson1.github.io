@@ -1,0 +1,259 @@
+---
+title: "An Analysis of Public ESPN Fantasy Football Teams"
+output: 
+  html_document:
+    includes: 
+      in_header: sources.html
+      after_body: footer.html
+      css: styles.css
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupp, include = FALSE}
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(results = 'hide')
+knitr::opts_chunk$set(fig.align = 'center')
+```
+
+## Setup - Read in Data and Create Environment
+
+The data that I will use in this post comes from the undocumented ESPN fantasy football API. A post about how I downloaded it is to come. 
+
+
+```{r setup}
+rm(list = ls())
+options(scipen = 999)
+
+library(dplyr)
+library(magrittr)
+library(jsonlite)
+library(tidyr)
+library(ggplot2)
+library(gdata)
+
+########################
+## IMPORT DATA
+########################
+
+## Import Matchup Data
+datMatchup <- read.csv(file.path("C:/Users/lvwilson/Desktop/ff","MatchupData","matchup_data.csv"))
+
+## Import Settings Data
+settings.dat <- readRDS(file.path("C:/Users/lvwilson/Desktop/ff//SettingsData","league_settings.rds"))
+
+## Import League Data
+dirdir = "C:/Users/lvwilson/Desktop/ff//LeagueData/csvfiles/"
+# Combine Datasets
+for (i in 0:29) {
+  filename = paste0("dataframe_",as.character(i*100000),".csv")
+  if (i == 0) {
+    aggregated = read.csv(file.path(dirdir,filename), header = TRUE, stringsAsFactors = FALSE)
+  }
+  else {
+    aggregated = rbind(aggregated, read.csv(file.path(dirdir,filename), header = TRUE, stringsAsFactors = FALSE))
+  }
+}
+
+# Select only valid responses
+valid_leagues = aggregated %>% filter(statusCode == 200) 
+
+# extract json from valid responses
+res <- jsonlite::stream_in(textConnection(valid_leagues$textResponse)) 
+
+# extract member level detail
+membs_expanded <- res %>% unnest_legacy(members) %>% 
+  select(id, id1, displayName, isLeagueManager) %>%
+  rename(leagueID=id,owners=id1) 
+
+# extract team level detail, add on league manager and league name data, filter to more valid leagues
+teams_expanded  <- res %>% unnest_legacy(teams) %>% 
+  rename(leagueID=id, teamID=id1) %>%
+  mutate(nelements = nchar(owners)) %>% 
+  group_by(leagueID) %>%
+  filter(min(nelements) > 12) %>% 
+  inner_join(unnest_legacy(.,owners) %>% 
+               select(leagueID, teamID, owners) %>% 
+               inner_join(filter(membs_expanded, leagueID %in% .$leagueID)) %>%
+                          group_by(leagueID, teamID) %>%
+                          summarise(nLMs = sum(isLeagueManager))) %>%
+  inner_join(cbind(leagueID = res$id, leagueName = res$settings[1])) %>%
+  filter(scoringPeriodId == 14) %>%
+  inner_join(settings.dat %>% select(leagueId,matchupPeriodCount) %>%
+               rename(leagueID=leagueId))
+
+# length(unique(teams_expanded$leagueID))
+# table(teams_expanded$nLMs)
+# table(teams_expanded$scoringPeriodId)
+
+# Clean up environment
+gdata::keep(res, valid_leagues, teams_expanded, datMatchup, settings.dat, sure = TRUE)
+
+```
+
+
+<br><br>
+
+## Some Filering of the Data
+Here we are subsetting to 10 team leagues that have finished their regular seasons. There are 7,398 such leagues for which I have data for. 
+
+
+```{r subsetdata, message = FALSE}
+# Figure out how many teams in each league:
+teams_expanded <- teams_expanded %>% 
+  group_by(leagueID) %>%
+  mutate(nteams = n(), nthTeam = seq_along(teamID))
+
+temp <- teams_expanded %>% filter(nteams==nthTeam)
+table(temp$nteams)
+
+tenTeamLeagues <- teams_expanded %>%
+  filter(nteams == 10)
+
+# Find valid 10 team leagues 
+matchupTenTeamLeagues <- datMatchup %>%
+  filter(leagueId %in% tenTeamLeagues$leagueID) %>%
+  inner_join(settings.dat %>% select(leagueId,matchupPeriodCount)) %>%
+  group_by(leagueId) %>%
+  filter(week <= matchupPeriodCount & matchupPeriodCount < 14) %>%
+  mutate(minPoints = min(points)) %>%
+  filter(minPoints > 10) %>%
+  select(-minPoints)
+
+```
+
+<br><br>
+
+## Are the Expected Wins Estimators valid?
+
+In each of the weekly reports that I have circulated to my team, I include two measures of expected wins. One is based on the number of teams that a given team scores more points than in each week of the regular season. The other is based on the number of points scored by each team and the other teams in a league. 
+
+<br>
+
+### Week Wins
+
+This approach sums, for each week, how many other teams you would have beaten. A team's expected win percentage is then calculated as the number of actual possible wins, divided by the maximum number of possible wins possible, 9*number of weeks. Only leagues that have completed their regular season are being analyzed. 
+
+```{r weekwins, message = FALSE}
+# Data Manip
+veryCool <- matchupTenTeamLeagues %>%
+  select(-X) %>%
+  mutate(win = ifelse(points > oppPoints, 1, 0)) %>%
+  group_by(leagueId, week) %>%
+  mutate(nwins = order(order(points, decreasing = FALSE)) - 1) %>%
+  group_by(leagueId, ID) %>%
+  summarise(weekwins = sum(nwins), 
+            wins = sum(win), 
+            nWeeks = max(week),
+            pointsFor = sum(points),
+            pointsAgainst = sum(oppPoints)) %>%
+  ungroup %>% 
+  mutate(expectedWinPct = weekwins/(nWeeks*9),
+         expectedWins = expectedWinPct*nWeeks,
+         difference = wins-expectedWins) %>%
+  arrange(difference) %>%
+  mutate(index = row_number())  
+length(unique(veryCool$leagueId))
+
+nTeams  <- length(veryCool$ID)
+avgDiff <- mean(veryCool$difference)
+sdDiff  <- sd(veryCool$difference)
+print(round(c(avgDiff, sdDiff),2))
+
+# Plotting 
+plot1 <- ggplot(veryCool,aes(x = index, y = difference)) + geom_area() + 
+  labs(title = "Distribution of Difference Between Actual and Expected Wins",
+       x = "",
+       y = "Difference (Actual-Expected)",
+       caption = paste0("This plot show the distribution of the difference between actual and expected wins \n  in ", 
+                        nTeams, " ESPN fantasy football teams. Each observation represents a team in a \n 10-team league in the 2019-2020 season."))
+
+normalTest <- ggplot(veryCool, aes(x = difference)) +
+  geom_density(linetype = "dotted") + 
+  stat_function(fun = dnorm, args = list(mean = mean(veryCool$difference), sd = sd(veryCool$difference)), color = "blue") + 
+  labs(title = "Distribution of Difference Between Actual and Expected Wins",
+       subtitle = "vs. Normal Distribution (solid)",
+       x = "Difference (Actual-Expected)",
+       y = "Frequency")
+
+```
+
+<br>
+
+#### Cumulative Plot
+
+```{r plots_ww_1, echo = FALSE}
+plot1
+```
+
+<br>
+
+#### Compared to Normal Distribution
+
+```{r plots_ww_2, echo = FALSE}
+normalTest
+```
+
+<br><br>
+
+### Pythagorean Expectation
+
+The [Pythagorean Expectation](https://en.wikipedia.org/wiki/Pythagorean_expectation) is a formula used to estimate the percentage of games a team "should" have won based on the number of runs/points they scored and allowed during a season. In the context of Fantasy Football, points allowed is somewhat meaningless, and as such we instead use the average of the total points scored by all other teams in the league as a proxy for points allowed. The formula for the Pythagorean Expectation is: $$\text{Win Ratio} = \frac{\text{Points For}^\text{f}}{\text{Points For}^\text{f} + \text{Points Allowed Proxy}^\text{f}}$$
+
+Where f is a positive number.  Initially I used 13.91 because that was the exponent used for basketball, and I thought that the scoring levels were fairly similar. While this may be true for a single game, the pythagorean expectation is performed at the season-team level, making this justification weak. I find that when using 6 for $\text{f}$, rather than 13.91, the difference between actual and expected wins is approximately normal. See the plot below.   
+
+```{r pythag_review}
+### Pythagorean Expectation
+
+# The difference is roughly normally distributed when using 6 as an exponent. 
+# Note that previously I was using 13.91 as an exponent. Doing so produces a 
+# distinctly non-normal difference between the number of wins and expected number. 
+# Initially used 13.91 because that was the exponent used for basketball, and I 
+# thought that the scoring levels were fairly similar. While this may be true
+# for a single game, the pythagorean expectation is performed at the season-team 
+# level, making this justification weak. 
+# See https://en.wikipedia.org/wiki/Pythagorean_expectation. 
+
+f = 6
+
+pyThagData <- matchupTenTeamLeagues %>%
+  select(-X) %>%
+  mutate(win = ifelse(points > oppPoints, 1, 0)) %>%
+  group_by(leagueId, ID) %>%
+  summarise(wins = sum(win), 
+            nWeeks = max(week),
+            pointsFor = sum(points),
+            pointsAgainst = sum(oppPoints)) %>%
+  group_by(leagueId) %>%
+  mutate(totalLeaguePF = sum(pointsFor), totalLeaguePA = sum(pointsAgainst)) %>%
+  ungroup() %>%
+  mutate(proxyPA = (totalLeaguePA-pointsAgainst)/9) %>%
+  mutate(winratio_6  = pointsFor^6/(pointsFor^6 + proxyPA^6),
+         winratio_13 = pointsFor^13.91/(pointsFor^13.91 + proxyPA^13.91)) %>%
+  mutate(expectedWins_6  = winratio_6*nWeeks,
+         difference_6    = wins-expectedWins_6,
+         expectedWins_13 = winratio_13*nWeeks,
+         difference_13   = wins-expectedWins_13) 
+
+normalTest <- pyThagData %>%
+  select(difference_6, difference_13) %>%
+  gather() %>%
+  ggplot(aes(x = value, linetype = key)) +
+  geom_density() + 
+  stat_function(fun = dnorm, args = list(mean = mean(pyThagData$difference_6), sd = sd(pyThagData$difference_6)), color = "blue") 
+
+#print(round(c(mean(pyThagData$difference), sd(pyThagData$difference)), 2))
+```
+ 
+<br>
+ 
+#### Compared to Normal Distribution
+
+```{r plots_ww_2_py, echo = FALSE}
+normalTest
+```
+
+

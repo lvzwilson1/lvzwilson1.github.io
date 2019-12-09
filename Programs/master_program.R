@@ -17,7 +17,7 @@ library(plotly)     # Pretty plot
 
 # Local Flags 
 download.data = 0
-thisWeek      = 12
+thisWeek      = 13
 
 # Locations of sub-routines
 rDataImportScript    = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Programs/data_creation.R'
@@ -53,5 +53,10 @@ rmarkdown::render(index.file,
 data.file = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Programs/data_import.Rmd'
 rmarkdown::render(data.file, 
                   output_file='data_import.html', 
+                  output_dir ='C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io')
+
+data.file = 'C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io/Programs/expected_wins_analysis_across_leagues.Rmd'
+rmarkdown::render(data.file, 
+                  output_file='expected_wins.html', 
                   output_dir ='C:/Users/lvwilson/Documents/GitHub/lvzwilson1.github.io')
 
