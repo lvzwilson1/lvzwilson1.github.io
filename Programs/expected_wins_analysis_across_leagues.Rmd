@@ -98,7 +98,7 @@ gdata::keep(res, valid_leagues, teams_expanded, datMatchup, settings.dat, sure =
 <br><br>
 
 ## Some Filering of the Data
-Here we are subsetting to 10 team leagues that have finished their regular seasons. There are 7,398 such leagues for which I have data for. 
+Here we are subsetting to 10 team leagues that have finished their regular seasons. There are 6,857 such leagues for which I have data for. 
 
 
 ```{r subsetdata, message = FALSE}
@@ -118,11 +118,11 @@ matchupTenTeamLeagues <- datMatchup %>%
   filter(leagueId %in% tenTeamLeagues$leagueID) %>%
   inner_join(settings.dat %>% select(leagueId,matchupPeriodCount)) %>%
   group_by(leagueId) %>%
-  filter(week <= matchupPeriodCount & matchupPeriodCount < 14) %>%
+  filter(week <= matchupPeriodCount & matchupPeriodCount == 13) %>%
   mutate(minPoints = min(points)) %>%
   filter(minPoints > 10) %>%
   select(-minPoints)
-
+length(unique(matchupTenTeamLeagues$leagueId))
 ```
 
 <br><br>
